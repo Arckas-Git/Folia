@@ -375,7 +375,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div id="import-preview"></div>
   </div>
 </div>
-<footer>Folia · v1.1.3 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.3.0 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
@@ -634,7 +634,13 @@ function renderAllocOverview(){
       +'<span class="delta-badge '+dCls+'">'+(delta>=0?'+':'')+delta.toFixed(1)+'%</span>'
       +(chip?'<span>'+chip+'</span>':'')
       +'</div></div></div>';
-  }).join('');
+  }).join('')
+  +'<div style="margin-top:12px;padding-top:11px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px 14px;font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.4;">'
+    +'<div style="display:flex;align-items:center;gap:5px;"><span class="delta-badge delta-down" style="font-size:9px;">−%</span><span>sous ta cible → à renforcer</span></div>'
+    +'<div style="display:flex;align-items:center;gap:5px;"><span class="delta-badge delta-ok" style="font-size:9px;">±0</span><span>aligné sur ta cible</span></div>'
+    +'<div style="display:flex;align-items:center;gap:5px;"><span class="delta-badge delta-up" style="font-size:9px;">+%</span><span>au-dessus de ta cible</span></div>'
+    +'<div style="display:flex;align-items:center;gap:5px;width:100%;margin-top:2px;"><span class="price-chip up" style="font-size:9px;">▲ %</span><span>variation du prix de l\'ETF ce mois-ci (sa performance)</span></div>'
+  +'</div>';
 }
 function renderDeltaChip(etf){
   const base=etfMonthPrice(etf);const cur=etfPrice(etf);
@@ -910,6 +916,15 @@ function renderEtfGrid(){
         +subsBody;
     }
 
+    // Écart actuel vs cible (même logique que l'onglet Répartition)
+    const gridTotal=state.etfs.reduce((s,e)=>s+etfValue(e),0);
+    const curPct=gridTotal>0?(val/gridTotal*100):0;
+    const delta=curPct-etf.target;
+    const dCls=Math.abs(delta)<1?'delta-ok':delta>0?'delta-up':'delta-down';
+    const deltaBadge=gridTotal>0&&val>0
+      ?'<span class="delta-badge '+dCls+'" style="font-size:9px;margin-left:6px;">'+curPct.toFixed(1)+'% ('+(delta>=0?'+':'')+delta.toFixed(1)+')</span>'
+      :'';
+
     body+='</div><div class="etf-card-footer">'
       +'<span style="font-size:10px;color:var(--text3);font-family:var(--mono);" id="footer-pct-'+eid+'">'+etf.target+'%</span>'
       +'<div class="etf-alloc-bar-bg"><div class="etf-alloc-bar" id="footer-bar-'+eid+'" style="width:'+Math.min(etf.target,100)+'%;background:'+color+';"></div></div>'
@@ -917,6 +932,7 @@ function renderEtfGrid(){
         ?'<span style="font-size:11px;font-family:var(--mono);color:var(--text2);margin-left:auto;" id="footer-price-'+eid+'">'+val.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €'+(etf._lastUpdated?' <span style="color:var(--text3);font-size:10px;">· '+etf._lastUpdated+'</span>':'')+'</span>'
         :'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:auto;" id="footer-price-'+eid+'">— €</span>'
       )
+      +deltaBadge
       +'</div>';
     card.innerHTML=body;grid.appendChild(card);
   });
@@ -1082,7 +1098,9 @@ function applyFetchResult(etf,i,info,manual){
   return true;
 }
 let autoRefreshTimer=null;
+let _lastRefreshTs=0;
 async function triggerRefresh(){
+  _lastRefreshTs=Date.now();
   const dot=document.getElementById('refresh-dot');const lbl=document.getElementById('refresh-label');
   if(dot)dot.className='status-dot live';if(lbl)lbl.textContent='…';
   const pm=await fetchAllBatch();let n=0;
@@ -1091,7 +1109,24 @@ async function triggerRefresh(){
   const now=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   if(dot)dot.className='status-dot'+(n>0?' live':'');if(lbl)lbl.textContent=n>0?'màj '+now:'—';
 }
-function startAutoRefresh(){if(autoRefreshTimer)clearInterval(autoRefreshTimer);const hasIds=state.etfs.some(e=>e.isin||e.ticker||(e.subs&&e.subs.some(s=>s.isin||s.ticker)));if(hasIds){autoRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible')triggerRefresh();},30*60*1000);}}
+function startAutoRefresh(){
+  if(autoRefreshTimer)clearInterval(autoRefreshTimer);
+  const hasIds=()=>state.etfs.some(e=>e.isin||e.ticker||(e.subs&&e.subs.some(s=>s.isin||s.ticker)));
+  if(!hasIds())return;
+  // 1) Rafraîchir une fois au démarrage (prix frais dès l'ouverture)
+  triggerRefresh();
+  // 2) Cycle régulier toutes les 15 min, uniquement si l'onglet est visible
+  autoRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible'&&hasIds())triggerRefresh();},15*60*1000);
+  // 3) Rafraîchir au retour sur l'onglet (si plus de 2 min depuis le dernier refresh)
+  if(!window._refocusBound){
+    window._refocusBound=true;
+    document.addEventListener('visibilitychange',()=>{
+      if(document.visibilityState==='visible'&&hasIds()&&Date.now()-_lastRefreshTs>2*60*1000){
+        triggerRefresh();
+      }
+    });
+  }
+}
 async function resolveSingle(i){
   const etf=state.etfs[i];if(!etf)return;
   const eid=etf.id;
@@ -1708,7 +1743,25 @@ function updateProj(){
     :'<span style="font-size:10px;font-family:var(--mono);color:var(--text3);">● estimation globale (ajoute des ETF avec prix pour affiner)</span>';
   document.getElementById('proj-metrics').innerHTML='<div style="grid-column:1/-1;margin-bottom:6px;">'+modeLabel+'</div><div class="metric"><div class="metric-label">valeur finale</div><div class="metric-value blue">'+fv.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">total investi</div><div class="metric-value">'+fi.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">plus-value</div><div class="metric-value green">+'+(fv-fi).toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">multiplicateur</div><div class="metric-value purple">×'+(fv/Math.max(fi,1)).toFixed(1)+'</div></div>';
   const ctx=document.getElementById('chart-proj');if(chartProj)chartProj.destroy();
-  chartProj=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'Optimiste ('+(ret*1.5).toFixed(1)+'%)',data:opt,borderColor:'rgba(52,211,153,.4)',fill:false,tension:.4,pointRadius:0,borderDash:[3,3]},{label:'Base ('+ret+'%)',data:base,borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,.07)',fill:true,tension:.4,pointRadius:0,borderWidth:2},{label:'Prudent ('+(ret*0.5).toFixed(1)+'%)',data:pess,borderColor:'rgba(251,191,36,.4)',fill:false,tension:.4,pointRadius:0,borderDash:[3,3]},{label:'Investi',data:invested,borderColor:'#555a66',fill:false,tension:0,pointRadius:0,borderDash:[6,4]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8a8f9e',font:{family:'IBM Plex Mono',size:11}}}},scales:{x:{ticks:{color:'#555a66',font:{family:'IBM Plex Mono',size:11}},grid:{color:'#1c1e22'}},y:{ticks:{color:'#555a66',font:{family:'IBM Plex Mono',size:11},callback:v=>Math.round(v).toLocaleString('fr-FR')+'€'},grid:{color:'#1c1e22'}}}}});
+  const eur=v=>Math.round(v).toLocaleString('fr-FR')+' €';
+  chartProj=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'Optimiste ('+(ret*1.5).toFixed(1)+'%)',data:opt,borderColor:'rgba(52,211,153,.4)',fill:false,tension:.4,pointRadius:0,pointHoverRadius:4,borderDash:[3,3]},{label:'Base ('+ret+'%)',data:base,borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,.07)',fill:true,tension:.4,pointRadius:0,pointHoverRadius:5,borderWidth:2},{label:'Prudent ('+(ret*0.5).toFixed(1)+'%)',data:pess,borderColor:'rgba(251,191,36,.4)',fill:false,tension:.4,pointRadius:0,pointHoverRadius:4,borderDash:[3,3]},{label:'Investi',data:invested,borderColor:'#555a66',fill:false,tension:0,pointRadius:0,pointHoverRadius:4,borderDash:[6,4]}]},options:{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false,axis:'x'}, // survol n'importe où en X → toutes les courbes
+    plugins:{
+      legend:{labels:{color:'#8a8f9e',font:{family:'IBM Plex Mono',size:11}}},
+      tooltip:{
+        enabled:true,
+        backgroundColor:'rgba(20,22,26,.95)',borderColor:'#2a2d34',borderWidth:1,
+        titleColor:'#e6e8ec',bodyColor:'#c4c8d0',titleFont:{family:'IBM Plex Mono',size:12,weight:'600'},
+        bodyFont:{family:'IBM Plex Mono',size:11},padding:10,boxPadding:5,usePointStyle:true,
+        callbacks:{
+          title:items=>items.length?(items[0].label==='Auj.'?"Aujourd'hui":'Dans '+items[0].label.replace('A','')+' an'+(items[0].label.replace('A','')==='1'?'':'s')):'',
+          label:c=>' '+c.dataset.label+' : '+eur(c.parsed.y)
+        }
+      }
+    },
+    scales:{x:{ticks:{color:'#555a66',font:{family:'IBM Plex Mono',size:11}},grid:{color:'#1c1e22'}},y:{ticks:{color:'#555a66',font:{family:'IBM Plex Mono',size:11},callback:v=>Math.round(v).toLocaleString('fr-FR')+'€'},grid:{color:'#1c1e22'}}}
+  }});
   const PV=Math.max(0,fv-fi),PS=0.186,FT=0.314,netA=fv-PV*PS,netB=fv-PV*FT,fmt=v=>Math.round(v).toLocaleString('fr-FR');
   const fc=document.getElementById('proj-fiscal-card');
   fc.innerHTML='<div class="card-title">Fiscalité PEA à la sortie</div>'
