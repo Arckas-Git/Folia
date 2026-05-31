@@ -375,14 +375,29 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div id="import-preview"></div>
   </div>
 </div>
-<footer>Folia · v1.1.0 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.1.3 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
-// Retirer l'écran d'intro après l'animation (libère les clics)
+// Écran d'intro : rejoué à chaque ouverture de l'onglet, SAUF sur un simple
+// rafraîchissement (F5). On utilise sessionStorage, qui survit à un refresh
+// mais s'efface dès qu'on ferme l'onglet.
 (function(){
   const intro=document.getElementById('intro-screen');
   if(!intro)return;
+
+  let sameTab=false;
+  try{sameTab=sessionStorage.getItem('folia_session')==='1';}catch(e){}
+
+  if(sameTab){
+    // Même onglet (refresh) → masquer immédiatement, pas d'animation
+    intro.style.animation='none';
+    intro.classList.add('done');
+    return;
+  }
+
+  // Nouvelle ouverture d'onglet → jouer l'intro et marquer la session
+  try{sessionStorage.setItem('folia_session','1');}catch(e){}
   const remove=()=>{intro.classList.add('done');};
   // L'animation introFade démarre à 2.4s et dure .6s → retrait à ~3s
   setTimeout(remove,3050);
