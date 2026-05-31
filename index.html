@@ -214,16 +214,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
       </div>
       <div style="font-size:12px;color:var(--accent);font-weight:500;" id="ob-action2">Configurer →</div>
     </div>
-    <!-- Étape 3 (optionnelle) : Twelve Data -->
-    <div class="onboarding-step" id="ob-step-td" onclick="openSettings()">
-      <div class="step-num" id="ob-num-td" style="font-size:9px;">opt.</div>
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:600;">Activer les prix en temps réel <span style="font-size:11px;font-weight:400;color:var(--text3);">(optionnel)</span></div>
-        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;">Connecte Twelve Data pour récupérer les prix automatiquement · gratuit, sinon saisis-les à la main</div>
-      </div>
-      <div style="font-size:12px;font-weight:500;" id="ob-action-td">Configurer →</div>
-    </div>
-    <!-- Étape 4 : Calculer -->
+    <!-- Étape 3 : Calculer -->
     <div class="onboarding-step" id="ob-step3" onclick="calculate()">
       <div class="step-num" id="ob-num3">3</div>
       <div style="flex:1;"><div style="font-size:13px;font-weight:600;">Calculer ton plan du mois</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;">Folia te dit exactement quoi acheter et combien</div></div>
@@ -362,11 +353,10 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
   <div class="modal">
     <div style="display:flex;align-items:center;justify-content:space-between;"><div style="font-size:15px;font-weight:600;">&#9881; Réglages</div><button onclick="closeSettings()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;">&#215;</button></div>
     <div>
-      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Twelve Data — Prix en temps réel</div>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:.75rem;">Clé API gratuite sur <a href="https://twelvedata.com" target="_blank" style="color:var(--accent);">twelvedata.com</a> — 800 req/jour.</p>
-      <div style="display:flex;gap:6px;margin-bottom:5px;"><input type="password" id="td-key" placeholder="Clé API…" style="flex:1;padding:7px 10px;height:34px;"/><button class="btn-resolve btn-sm" id="td-test-btn" onclick="testTdKey()">Tester</button></div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--text3);min-height:14px;" id="td-status"></div>
-      <div style="font-size:11px;font-family:var(--mono);color:var(--amber);margin-top:8px;padding:7px 9px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.2);border-radius:var(--r);line-height:1.45;">⚠ Le plan gratuit ne couvre que les bourses US. Les ETF cotés à Paris (XPAR), Xetra ou Londres ne seront pas récupérés automatiquement — dans ce cas, saisis simplement leur prix à la main dans « Mon portefeuille » (c'est gratuit et tout aussi fiable).</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Prix des ETF</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:.5rem;">Les prix sont récupérés <strong>automatiquement</strong> (cours de clôture, via Yahoo Finance) à partir de l'ISIN ou du ticker de chaque ETF. Rien à configurer.</div>
+      <div style="font-size:11px;font-family:var(--mono);color:var(--text3);line-height:1.45;padding:7px 9px;background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.18);border-radius:var(--r);">Tu peux aussi saisir ou corriger un prix à la main dans « Mon portefeuille » à tout moment — la saisie manuelle a toujours priorité.</div>
+      <div id="td-status" style="display:none;"></div>
     </div>
     <div>
       <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Données</div>
@@ -385,7 +375,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div id="import-preview"></div>
   </div>
 </div>
-<footer>Folia · v1.0.5 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.1.0 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
@@ -460,7 +450,6 @@ function updateOnboarding(){
   const hasAnyEtf=state.etfs.length>0;
   const allocOk=state.etfs.some(e=>e.target>0)&&Math.abs(state.etfs.reduce((s,e)=>s+(+e.target||0),0)-100)<0.5;
   const hasCalc=!!state.lastCalcDate;
-  const hasTd=!!(state.twelveDataKey||'').trim();
   const ob=document.getElementById('onboarding');
   if(hasAnyEtf&&allocOk&&hasCalc){ob.style.display='none';return;}
   ob.style.display='block';
@@ -486,22 +475,6 @@ function updateOnboarding(){
   setStep(1,hasAnyEtf,!hasAnyEtf);
   // Étape 2 : allocations cibles à 100% (l'épargne a une valeur par défaut, donc on valide sur l'alloc)
   setStep(2,allocOk,hasAnyEtf&&!allocOk);
-  // Étape Twelve Data — optionnelle
-  const tdStep=document.getElementById('ob-step-td');
-  const tdNum=document.getElementById('ob-num-td');
-  const tdAct=document.getElementById('ob-action-td');
-  if(tdStep){
-    if(hasTd){
-      tdStep.classList.add('done');tdStep.style.opacity='1';
-      if(tdNum)tdNum.textContent='✓';
-      if(tdAct){tdAct.textContent='Actif ✓';tdAct.style.color='var(--green)';}
-    } else {
-      tdStep.classList.remove('done');
-      if(tdNum){tdNum.textContent='opt.';tdNum.style.fontSize='9px';}
-      if(tdAct){tdAct.textContent='Configurer →';tdAct.style.color='var(--text3)';}
-      tdStep.style.borderColor='';tdStep.style.background='';tdStep.style.opacity='0.7';
-    }
-  }
   // Étape 3 : calculer (active dès que l'alloc est OK)
   setStep(3,hasCalc,allocOk&&!hasCalc);
 }
@@ -1010,136 +983,54 @@ function setMode(m){
   // mode buttons removed
   renderEtfGrid();
 }
-async function resolveIsinToTicker(isin,tdKey){
-  if(!state._isinCache)state._isinCache={};
-  // Cache : retourner si déjà résolu AU FORMAT COMPLET (avec ':')
-  // Les anciennes valeurs sans ':' (symbole nu) sont ignorées et re-résolues
-  // car un symbole nu envoyé à /price peut pointer vers un homonyme US.
-  if(state._isinCache[isin]&&state._isinCache[isin].includes(':'))return state._isinCache[isin];
-  try{
-    const r=await fetch('https://api.twelvedata.com/symbol_search?symbol='+encodeURIComponent(isin)+'&apikey='+encodeURIComponent(tdKey),{signal:AbortSignal.timeout(6000)});
-    if(!r.ok)return null;
-    const d=await r.json();
-    const hits=d.data||[];
-    if(!hits.length)return null;
-    // Construire toujours "SYMBOLE:MIC" pour lever l'ambiguïté d'exchange
-    const fullSym=h=>h.symbol+':'+(h.mic_code||'XPAR');
-    // Priorité absolue : Euronext Paris (XPAR)
-    const xpar=hits.find(h=>h.mic_code==='XPAR'||h.exchange==='Euronext Paris');
-    if(xpar){const s=fullSym(xpar);state._isinCache[isin]=s;save();return s;}
-    // ISIN européens : n'accepter QUE les exchanges européens (jamais un homonyme US)
-    const euroISIN=isin.startsWith('FR')||isin.startsWith('LU')||isin.startsWith('IE')||isin.startsWith('DE');
-    const euroMics=['XPAR','XETR','XLON','XAMS','XMIL','XBRU','XLIS','XMAD'];
-    if(euroISIN){
-      const euroHit=hits.find(h=>euroMics.includes(h.mic_code)||['Euronext','Xetra','LSE','London'].some(ex=>(h.exchange||'').includes(ex)));
-      if(euroHit){const s=fullSym(euroHit);state._isinCache[isin]=s;save();return s;}
-      return null; // aucun exchange européen → ne pas risquer un faux positif US
-    }
-    // Autres ISIN : premier résultat, avec son exchange
-    const s=fullSym(hits[0]);state._isinCache[isin]=s;save();return s;
-  }catch(e){return null;}
-}
 
 async function fetchByEtf(etf){
   const isin=(etf.isin||'').trim().toUpperCase();
-  const tdKey=(state.twelveDataKey||'').trim();
-  if(!tdKey)return{error:'no-key',msg:'Clé Twelve Data non renseignée (Réglages ⚙)'};
-  if(!isin&&!etf.ticker)return{error:'no-id',msg:'Aucun ISIN ni ticker renseigné'};
-  if(!state._isinCache)state._isinCache={};
+  const ticker=(etf.ticker||'').trim().toUpperCase();
+  if(!isin&&!ticker)return{error:'no-id',msg:'Aucun ISIN ni ticker renseigné'};
 
-  let sym=null,resolveFailed=false;
-
-  // Priorité 1 : ISIN via cache (format complet uniquement) ou résolution
-  if(isin){
-    if(state._isinCache[isin]&&state._isinCache[isin].includes(':')){
-      sym=state._isinCache[isin];
-    } else {
-      const resolved=await resolveIsinToTicker(isin,tdKey);
-      if(resolved)sym=resolved;else resolveFailed=true;
-    }
-    if(sym&&etf.ticker!==sym.replace(':','.'))etf.ticker=sym.replace(':','.');
-  }
-
-  // Priorité 2 : ticker existant converti au format Twelve Data
-  if(!sym&&etf.ticker){
-    sym=etf.ticker.replace(/\.PA$/,':XPAR').replace(/\.DE$/,':XETR').replace(/\.L$/,':XLON').replace(/\.([A-Z]+)$/,':$1');
-  }
-
-  if(!sym||sym.startsWith(':')||sym.endsWith(':')){
-    return{error:'unresolved',msg:isin?'ISIN '+isin+' introuvable sur les places européennes':'Identifiant non résolu — vérifie l\'ISIN ou le ticker'};
-  }
+  // On interroge notre fonction serveur Netlify, qui va chercher le prix sur
+  // Yahoo Finance côté serveur (pas de blocage CORS, couvre Euronext Paris).
+  // En local (fichier ouvert hors Netlify), la fonction n'existe pas → message clair.
+  const qs=[];
+  if(isin)qs.push('isin='+encodeURIComponent(isin));
+  if(ticker)qs.push('ticker='+encodeURIComponent(ticker));
+  const url='/.netlify/functions/price?'+qs.join('&');
 
   try{
-    // Twelve Data attend le MIC dans un paramètre SÉPARÉ (&mic_code=), pas collé "SYM:MIC".
-    // On découpe donc "ESE:XPAR" → symbol=ESE & mic_code=XPAR.
-    let qSym=sym,qMic='';
-    if(sym.includes(':')){const parts=sym.split(':');qSym=parts[0];qMic=parts[1];}
-    let url='https://api.twelvedata.com/price?symbol='+encodeURIComponent(qSym)+'&apikey='+encodeURIComponent(tdKey);
-    if(qMic)url+='&mic_code='+encodeURIComponent(qMic);
-    const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
+    const r=await fetch(url,{signal:AbortSignal.timeout(12000)});
+    if(r.status===404){
+      return{error:'no-server',msg:'Récupération auto indisponible ici (ouvre l\'app via son adresse en ligne). En local, saisis les prix à la main.'};
+    }
     let d=null;
     try{d=await r.json();}catch(_){}
-    if(d&&(d.code||d.status==='error')){
-      const m=(d.message||'').toLowerCase();
-      if(m.includes('api key')||m.includes('apikey')||d.code===401)return{error:'bad-key',msg:'Clé Twelve Data invalide ou absente'};
-      if(m.includes('limit')||m.includes('credits')||d.code===429)return{error:'quota',msg:'Quota Twelve Data atteint (réessaie plus tard ou demain)'};
-      if(d.code===404||m.includes('not found')||m.includes('not be found')||m.includes('symbol')){
-        const euroMics=['XPAR','XETR','XLON','XAMS','XMIL','XBRU','XLIS','XMAD','XDUB'];
-        if(qMic&&euroMics.includes(qMic)){
-          return{error:'plan',msg:qMic+' (bourse européenne) non couvert par le plan gratuit Twelve Data. Saisis le prix manuellement, ou passe à un plan payant.'};
-        }
-        return{error:'symbol',msg:'Symbole « '+qSym+(qMic?' / '+qMic:'')+' » introuvable sur Twelve Data — vérifie l\'ISIN/ticker'};
-      }
-      return{error:'api',msg:(d.message?d.message.slice(0,90):'Erreur Twelve Data')+(d.code?' (code '+d.code+')':'')};
+    if(!d)return{error:'http',msg:'Réponse inattendue du serveur de prix'};
+    if(d.error)return{error:'yahoo',msg:d.error};
+    if(d.price){
+      // Mémoriser le symbole Yahoo résolu comme ticker, pour les fois suivantes
+      if(d.symbol&&!etf.ticker)etf.ticker=d.symbol;
+      return{price:+d.price,name:d.name||null,source:'Yahoo ✓'};
     }
-    if(d&&d.price)return{price:+d.price,name:null,source:'Twelve Data ✓'};
-    if(!r.ok)return{error:'http',msg:'Réponse Twelve Data inattendue (HTTP '+r.status+') pour « '+qSym+' »'};
-    return{error:'no-price',msg:'Aucun prix retourné pour « '+qSym+' »'};
+    return{error:'no-price',msg:'Aucun prix retourné pour '+(ticker||isin)};
   }catch(e){
     if(e.name==='TimeoutError'||e.name==='AbortError')return{error:'timeout',msg:'Délai dépassé — vérifie ta connexion'};
     return{error:'network',msg:'Échec réseau — vérifie ta connexion'};
   }
 }
 async function fetchAllBatch(){
-  const tdKey=(state.twelveDataKey||'').trim();
   const solos=state.etfs.filter(e=>(!e.subs||!e.subs.length)&&(e.ticker||e.isin));
   const subItems=[];
   state.etfs.forEach(e=>{if(e.subs&&e.subs.length)e.subs.forEach((sub,si)=>{if(sub.ticker||sub.isin)subItems.push({etf:e,sub,si});});});
   const results={};
 
-  if(!tdKey){
-    solos.forEach(e=>{if(e.avgPrice>0)results[e.id]={price:e.avgPrice,name:null,source:'cache'};});
-    return results;
-  }
-
-  if(!state._isinCache)state._isinCache={};
-
-  // Résoudre ISIN → ticker si ticker absent OU ambigu (sans suffixe exchange)
-  // Un ticker nu comme "ESE" peut pointer vers un homonyme US sur /price.
-  const hasExchange=t=>/[.:][A-Z]{1,4}$/.test(t||'');
-  const needResolve=solos.filter(e=>isISIN(e.isin||'')&&(!e.ticker||!hasExchange(e.ticker)));
-  if(needResolve.length){
-    await Promise.all(needResolve.map(async e=>{
-      const sym=await resolveIsinToTicker(e.isin,tdKey);
-      if(sym){e.ticker=sym.replace(':','.');}
-    }));
-    save();
-  }
-  const subsNeedResolve=subItems.filter(x=>isISIN(x.sub.isin||'')&&(!x.sub.ticker||!hasExchange(x.sub.ticker)));
-  if(subsNeedResolve.length){
-    await Promise.all(subsNeedResolve.map(async x=>{
-      const sym=await resolveIsinToTicker(x.sub.isin,tdKey);
-      if(sym){x.sub.ticker=sym.replace(':','.');}
-    }));
-    save();
-  }
-
-  // Fetch prix : on interroge chaque ETF via fetchByEtf (qui gère mic_code séparé).
-  // Plus fiable qu'un batch "SYM:MIC" collé que /price ne reconnaît pas.
+  // Récupération des prix via notre fonction serveur (Yahoo). Chaque ETF est
+  // interrogé individuellement par fetchByEtf. Si la fonction n'est pas
+  // disponible (app ouverte en local), on retombe sur les prix déjà connus.
   const withId=solos.filter(e=>e.ticker||isISIN(e.isin||''));
   await Promise.all(withId.map(async e=>{
     const info=await fetchByEtf(e);
     if(info&&info.price)results[e.id]={price:info.price,name:info.name,source:info.source};
+    else if(e.avgPrice>0)results[e.id]={price:e.avgPrice,name:null,source:'cache'};
   }));
 
   // Fetch subs individuellement aussi
@@ -1185,7 +1076,7 @@ async function triggerRefresh(){
   const now=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   if(dot)dot.className='status-dot'+(n>0?' live':'');if(lbl)lbl.textContent=n>0?'màj '+now:'—';
 }
-function startAutoRefresh(){if(autoRefreshTimer)clearInterval(autoRefreshTimer);if(state.twelveDataKey){autoRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible')triggerRefresh();},30*60*1000);}}
+function startAutoRefresh(){if(autoRefreshTimer)clearInterval(autoRefreshTimer);const hasIds=state.etfs.some(e=>e.isin||e.ticker||(e.subs&&e.subs.some(s=>s.isin||s.ticker)));if(hasIds){autoRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible')triggerRefresh();},30*60*1000);}}
 async function resolveSingle(i){
   const etf=state.etfs[i];if(!etf)return;
   const eid=etf.id;
@@ -1263,8 +1154,7 @@ async function calculate(){
   syncSettingsFromInputs();
   if(!state.subChoices)state.subChoices={};
   const btn=document.getElementById('btn-calc');btn.disabled=true;btn.textContent='Calcul…';
-  const tdKey=(state.twelveDataKey||'').trim();
-  setCalcStatus('live',tdKey?'Récupération des prix via Twelve Data…':'Calcul avec les prix en mémoire…');
+  setCalcStatus('live','Récupération des prix…');
   try{
   const pm=await fetchAllBatch();
 
@@ -1272,8 +1162,8 @@ async function calculate(){
     if(e.subs&&e.subs.length)return e.subs.some(s=>!(s.avgPrice>0));
     return !((pm[e.id]?.price||e.avgPrice)>0);
   });
-  if(missingPrices.length&&!tdKey){
-    setCalcStatus('','⚠ Prix manquants — configure Twelve Data dans les Réglages ou saisis les prix en mode Avancé');
+  if(missingPrices.length){
+    setCalcStatus('','⚠ Prix manquants — saisis-les dans « Mon portefeuille » (les prix se récupèrent sinon automatiquement)');
   }
   const getTicker=e=>{
     if(e.subs&&e.subs.length>0){const si=state.subChoices[e.id]??0;const sub=e.subs[si];return sub?.ticker||sub?.isin||'';}
@@ -1540,24 +1430,12 @@ function resetAllData(){
   save();
   // 4. Réinitialiser les inputs du modal réglages
   document.getElementById('monthly').value=state.monthly;
-  document.getElementById('td-key').value='';
-  document.getElementById('td-status').textContent='';
   // 5. Fermer le modal, re-render toutes les vues
   closeSettings();
   renderEtfGrid();
   renderMonthly();
 }
-async function testTdKey(){
-  const key=(document.getElementById('td-key').value||'').trim();const btn=document.getElementById('td-test-btn');const st=document.getElementById('td-status');
-  if(!key){st.style.color='var(--amber)';st.textContent='Saisis une clé.';return;}
-  btn.textContent='…';btn.disabled=true;
-  try{const r=await fetch('https://api.twelvedata.com/api_usage?apikey='+encodeURIComponent(key),{signal:AbortSignal.timeout(8000)});const d=await r.json();
-  if(d.current_usage!==undefined||d.plan){state.twelveDataKey=key;save();startAutoRefresh();st.style.color='var(--green)';st.textContent='✓ Clé valide · '+(d.plan||'?')+' · '+(d.current_usage||0)+'/'+(d.daily_limit||800)+' req';updateOnboarding();}
-  else if(d.code===401||d.code===403){st.style.color='var(--red)';st.textContent='Clé invalide';}
-  else{st.style.color='var(--amber)';st.textContent=(d.message||'Réponse inattendue');}
-  }catch(e){st.style.color='var(--red)';st.textContent='Erreur réseau';}
-  btn.textContent='Tester';btn.disabled=false;
-}
+async function testTdKey(){/* Twelve Data retiré — prix récupérés automatiquement via la fonction serveur (Yahoo). */}
 let chartHistory=null;
 function renderHistory(){
   const list=document.getElementById('history-list');
@@ -1832,7 +1710,7 @@ function renderEtfProjection(years,monthly,retPct,simResult){
     card.innerHTML='<div class="card-title">Projection par ETF</div><div style="font-size:12px;color:var(--text3);font-family:var(--mono);padding:.5rem 0;">Ajoute des ETF avec une allocation cible pour voir la projection détaillée.</div>';return;
   }
   if(!simResult.ok){
-    card.innerHTML='<div class="card-title">Projection par ETF</div><div style="font-size:12px;color:var(--amber);font-family:var(--mono);padding:.5rem 0;">⚠ Renseigne le prix de chaque ETF (ou active Twelve Data) pour projeter l\'accumulation de parts.</div>';
+    card.innerHTML='<div class="card-title">Projection par ETF</div><div style="font-size:12px;color:var(--amber);font-family:var(--mono);padding:.5rem 0;">⚠ Renseigne le prix de chaque ETF pour projeter l\'accumulation de parts (les prix se récupèrent normalement tout seuls).</div>';
     return;
   }
   const sim=simResult.finalEtfs;
@@ -1876,7 +1754,6 @@ document.getElementById('freq').value=state.freq||'monthly';
 document.getElementById('max-defer').value=state.maxDefer||3;
 document.getElementById('rebal-mode').value=state.rebalMode||'asap';
 document.getElementById('rebal-months').value=state.rebalMonths||12;
-if(state.twelveDataKey){document.getElementById('td-key').value=state.twelveDataKey;document.getElementById('td-status').style.color='var(--green)';document.getElementById('td-status').textContent='✓ Actif';}
 document.getElementById('rebal-mode').addEventListener('change',function(){document.getElementById('rebal-months-wrap').style.display=this.value==='months'?'flex':'none';});
 if(state.rebalMode==='months')document.getElementById('rebal-months-wrap').style.display='flex';
 // Synchronisation temps réel des paramètres DCA → state + bandeau + projection
