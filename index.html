@@ -350,6 +350,17 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
   <div class="card" id="proj-fiscal-card"></div>
 </div>
 <!-- SETTINGS OVERLAY -->
+<div class="overlay" id="poscheck-overlay" style="display:none;" onclick="if(event.target===this)closePosCheck()">
+  <div class="modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;"><div style="font-size:15px;font-weight:600;">Vérifie tes positions</div><button onclick="closePosCheck()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;">&#215;</button></div>
+    <p style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:2px;">Nouveau mois : confirme le nombre de parts réellement détenues (lis-les sur Trade Republic). Tes ordres programmés ont pu acheter un nombre de parts différent du plan à cause des arrondis.</p>
+    <div id="poscheck-list" style="display:flex;flex-direction:column;gap:8px;margin:12px 0;"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-ghost" style="flex:1;" onclick="closePosCheck()">Plus tard</button>
+      <button class="btn-add" style="flex:1;margin:0;" onclick="confirmPosCheck()">C'est à jour, calculer →</button>
+    </div>
+  </div>
+</div>
 <div class="overlay" id="settings-overlay" style="display:none;" onclick="if(event.target===this)closeSettings()">
   <div class="modal">
     <div style="display:flex;align-items:center;justify-content:space-between;"><div style="font-size:15px;font-weight:600;">&#9881; Réglages</div><button onclick="closeSettings()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;">&#215;</button></div>
@@ -381,7 +392,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div id="import-preview"></div>
   </div>
 </div>
-<footer>Folia · v1.9.0 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.10.1 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
@@ -814,6 +825,7 @@ async function resolveSubEtf(eid,si){
     return;
   }
   clearFetchError(eid);
+  const prevSub=sub.avgPrice||0;
   updateMonthlyBaseline(sub);
   sub.avgPrice=info.price;
   if(info.name&&!sub.name)sub.name=info.name;
@@ -823,6 +835,8 @@ async function resolveSubEtf(eid,si){
   const sv=document.getElementById('sub-val-'+eid+'-'+si);
   if(sv)sv.textContent=subVal>0?'= '+subVal.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €':'= — €';
   if(btn){btn.textContent='✓';btn.style.color='var(--green)';setTimeout(()=>{btn.textContent='⟳';btn.style.color='';},2000);}
+  const sameSub=Math.abs((sub.avgPrice||0)-prevSub)<0.0001;
+  showFetchInfo(eid,(sub.name||'Émetteur')+' — '+(sameSub?'prix inchangé : ':'prix mis à jour : ')+sub.avgPrice.toFixed(2)+' €');
   save();renderAllocOverview();renderPieChart();updateHealthBar();refreshFooterPrice(eid);
 }
 window.addSubEtf=addSubEtf;
@@ -1189,22 +1203,44 @@ async function resolveSingle(i){
   const etf=state.etfs[i];if(!etf)return;
   const eid=etf.id;
   const btn=document.getElementById('resolve-btn-'+eid);
-  if(btn){btn.textContent='…';btn.disabled=true;}
+  if(btn){btn.textContent='…';btn.disabled=true;btn.style.color='';}
+  const prevPrice=etf.avgPrice||0;
   const info=await fetchByEtf(etf);
-  if(btn){btn.textContent='⟳';btn.disabled=false;}
+  if(btn){btn.disabled=false;}
   if(!info||!info.price){
     if(btn){btn.textContent='✕';btn.style.color='var(--red)';setTimeout(()=>{if(btn){btn.textContent='⟳';btn.style.color='';}},2500);}
-    // Afficher la raison précise de l'échec
-    showFetchError(eid,info?.msg||'Échec inconnu');
+    showFetchError(eid,info?.msg||'Échec inconnu — réessaie dans un instant');
     return;
   }
   clearFetchError(eid);
   applyFetchResult(etf,i,info,true);
+  save();
+  // Mettre à jour les vues annexes SANS reconstruire la grille (sinon le ✓ disparaît)
+  renderAllocOverview();updateHealthBar();renderPieChart();refreshFooterPrice(eid);
+  // Feedback : ✓ vert, + petit message si le prix est resté identique
   if(btn){btn.textContent='✓';btn.style.color='var(--green)';setTimeout(()=>{if(btn){btn.textContent='⟳';btn.style.color='';}},2000);}
-  save();renderEtfGrid();renderAllocOverview();updateHealthBar();renderPieChart();
+  const same=Math.abs((etf.avgPrice||0)-prevPrice)<0.0001;
+  showFetchInfo(eid, same
+    ? 'Prix à jour : '+etf.avgPrice.toFixed(2)+' € (inchangé depuis la dernière clôture)'
+    : 'Prix mis à jour : '+etf.avgPrice.toFixed(2)+' € · '+(info.source||'Yahoo'));
+}
+// Message vert temporaire de succès sous la card
+function showFetchInfo(eid,msg){
+  clearFetchError(eid);
+  const card=document.getElementById('etf-card-'+eid);if(!card)return;
+  let el=document.getElementById('fetch-info-'+eid);
+  if(!el){
+    el=document.createElement('div');el.id='fetch-info-'+eid;
+    el.style.cssText='font-size:10px;font-family:var(--mono);color:var(--green);margin-top:6px;padding:5px 8px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.25);border-radius:var(--r);line-height:1.4;';
+    card.appendChild(el);
+  }
+  el.textContent='✓ '+msg;
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>{if(el)el.remove();},4000);
 }
 // Affiche/efface un message d'erreur de fetch sous la card de l'ETF
 function showFetchError(eid,msg){
+  const info=document.getElementById('fetch-info-'+eid);if(info)info.remove();
   let el=document.getElementById('fetch-err-'+eid);
   if(!el){
     const footer=document.getElementById('footer-price-'+eid);
@@ -1256,9 +1292,68 @@ window.setSubChoice=function(eid,si){
   save();
   renderSubChoices();
 };
+let _posCheckDone=false;
+// Faut-il proposer la vérification des positions ? Oui si on a déjà calculé un jour
+// ET que le mois en cours diffère du mois du dernier calcul.
+function shouldCheckPositions(){
+  if(!state.lastCalcDate)return false; // jamais calculé → onboarding suffit
+  if(!state.etfs.length)return false;
+  const last=new Date(state.lastCalcDate);
+  const now=new Date();
+  const lastTag=last.getFullYear()+'-'+last.getMonth();
+  const nowTag=now.getFullYear()+'-'+now.getMonth();
+  return lastTag!==nowTag; // mois différent
+}
+function openPosCheck(){
+  const list=document.getElementById('poscheck-list');
+  list.innerHTML=state.etfs.map((e,i)=>{
+    const color=COLORS[i%COLORS.length];
+    if(e.subs&&e.subs.length){
+      return '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:9px 11px;">'
+        +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:7px;"><span style="width:8px;height:8px;border-radius:50%;background:'+color+';display:inline-block;"></span><span style="font-size:12px;font-weight:600;">'+e.name+'</span></div>'
+        +e.subs.map((s,si)=>'<div style="display:flex;align-items:center;gap:8px;margin-top:4px;"><span style="font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(s.name||s.isin||'Émetteur '+(si+1))+'</span><input type="number" min="0" step="0.0001" value="'+(s.shares||0)+'" id="pc-sub-'+e.id+'-'+si+'" style="width:90px;text-align:right;padding:5px 8px;height:30px;font-size:12px;"/></div>').join('')
+        +'</div>';
+    }
+    return '<div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:9px 11px;">'
+      +'<span style="width:8px;height:8px;border-radius:50%;background:'+color+';display:inline-block;flex-shrink:0;"></span>'
+      +'<span style="font-size:12px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e.name+'</span>'
+      +'<input type="number" min="0" step="0.0001" value="'+(e.shares||0)+'" id="pc-'+e.id+'" style="width:90px;text-align:right;padding:5px 8px;height:30px;font-size:12px;"/>'
+      +'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);">parts</span>'
+      +'</div>';
+  }).join('');
+  document.getElementById('poscheck-overlay').style.display='flex';
+}
+function closePosCheck(){document.getElementById('poscheck-overlay').style.display='none';}
+function confirmPosCheck(){
+  // Lire les valeurs saisies et mettre à jour les positions
+  let changed=false;
+  state.etfs.forEach(e=>{
+    if(e.subs&&e.subs.length){
+      e.subs.forEach((s,si)=>{
+        const inp=document.getElementById('pc-sub-'+e.id+'-'+si);
+        if(inp){const v=+inp.value||0;if(v!==s.shares){s.shares=v;changed=true;}}
+      });
+    } else {
+      const inp=document.getElementById('pc-'+e.id);
+      if(inp){const v=+inp.value||0;if(v!==e.shares){e.shares=v;changed=true;}}
+    }
+  });
+  if(changed)save();
+  closePosCheck();
+  _posCheckDone=true; // éviter de rouvrir le modal en boucle
+  syncAllViews&&syncAllViews();
+  renderEtfGrid();
+  calculate(); // reprendre le calcul avec les positions confirmées
+}
 async function calculate(){
   const total=state.etfs.reduce((s,e)=>s+(+e.target||0),0);
   if(total!==100){alert('La somme des allocations doit être 100%.');return;}
+  // Vérification des positions au changement de mois (sauf si on revient du modal)
+  if(!_posCheckDone&&shouldCheckPositions()){
+    openPosCheck();
+    return; // le calcul reprendra après confirmation via confirmPosCheck()
+  }
+  _posCheckDone=false; // réinitialiser pour le prochain mois
   syncSettingsFromInputs();
   if(!state.subChoices)state.subChoices={};
   const btn=document.getElementById('btn-calc');btn.disabled=true;btn.textContent='Calcul…';
@@ -2017,6 +2112,7 @@ window.openImportModal=openImportModal;window.closeImportModal=closeImportModal;
 window.handleCsvFile=handleCsvFile;window.applyImport=applyImport;
 window.updateProj=updateProj;window.testTdKey=testTdKey;
 window.openSettings=openSettings;window.closeSettings=closeSettings;window.resetAllData=resetAllData;
+window.closePosCheck=closePosCheck;window.confirmPosCheck=confirmPosCheck;
 window.exportData=exportData;window.importData=importData;
 window.confirmOrders=confirmOrders;window.skipConfirm=skipConfirm;
 renderEtfGrid();
