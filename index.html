@@ -407,7 +407,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div id="import-preview"></div>
   </div>
 </div>
-<footer>Folia · v1.13.0 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.14.0 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
@@ -1187,7 +1187,14 @@ function applyFetchResult(etf,i,info,manual){
 }
 let autoRefreshTimer=null;
 let _lastRefreshTs=0;
-async function triggerRefresh(){
+// Délai minimal entre deux refresh AUTOMATIQUES (anti-rafale + économie de crédits).
+// Les prix Yahoo sont des cours de clôture (1 valeur/jour), donc rafraîchir plus
+// souvent ne récupère aucune nouvelle donnée. Un clic manuel (force=true) ignore ce délai.
+const _MIN_AUTO_REFRESH_MS=6*60*60*1000; // 6 h
+async function triggerRefresh(force){
+  // Garde-fou : ne pas refaire un appel réseau si un refresh récent a déjà eu lieu,
+  // sauf demande explicite (force) — clic manuel, import CSV…
+  if(!force&&_lastRefreshTs&&(Date.now()-_lastRefreshTs<_MIN_AUTO_REFRESH_MS))return;
   _lastRefreshTs=Date.now();
   const dot=document.getElementById('refresh-dot');const lbl=document.getElementById('refresh-label');
   if(dot)dot.className='status-dot live';if(lbl)lbl.textContent='…';
@@ -1198,20 +1205,17 @@ async function triggerRefresh(){
   if(dot)dot.className='status-dot'+(n>0?' live':'');if(lbl)lbl.textContent=n>0?'màj '+now:'—';
 }
 function startAutoRefresh(){
-  if(autoRefreshTimer)clearInterval(autoRefreshTimer);
   const hasIds=()=>state.etfs.some(e=>e.isin||e.ticker||(e.subs&&e.subs.some(s=>s.isin||s.ticker)));
   if(!hasIds())return;
-  // 1) Rafraîchir une fois au démarrage (prix frais dès l'ouverture)
+  // 1) Refresh au démarrage — mais seulement si le dernier date de plus de 6h
+  //    (le garde-fou interne de triggerRefresh s'en charge).
   triggerRefresh();
-  // 2) Cycle régulier toutes les 15 min, uniquement si l'onglet est visible
-  autoRefreshTimer=setInterval(()=>{if(document.visibilityState==='visible'&&hasIds())triggerRefresh();},15*60*1000);
-  // 3) Rafraîchir au retour sur l'onglet (si plus de 2 min depuis le dernier refresh)
+  // 2) Refresh au retour sur l'onglet, encadré par le même garde-fou (6h).
+  //    Plus de timer répétitif : inutile vu les cours de clôture quotidiens.
   if(!window._refocusBound){
     window._refocusBound=true;
     document.addEventListener('visibilitychange',()=>{
-      if(document.visibilityState==='visible'&&hasIds()&&Date.now()-_lastRefreshTs>2*60*1000){
-        triggerRefresh();
-      }
+      if(document.visibilityState==='visible'&&hasIds())triggerRefresh();
     });
   }
 }
@@ -1728,9 +1732,18 @@ function confirmOrders(){
     state.etfs.forEach(e=>{
       const d=results.find(x=>x.id===e.id);
       if(d&&d.action==='buy'){
-        e.shares=+(e.shares+d.shares_to_buy).toFixed(4);
-        // Mettre à jour avgPrice avec le prix utilisé pour l'achat (validé par l'utilisateur)
-        if(d.price>0)e.avgPrice=d.price;
+        if(e.subs&&e.subs.length){
+          // ETF groupé : créditer le sous-ETF (émetteur) choisi ce mois-ci
+          const si=state.subChoices?.[e.id]??0;
+          const sub=e.subs[si]||e.subs[0];
+          if(sub){
+            sub.shares=+(((sub.shares||0)+d.shares_to_buy)).toFixed(4);
+            if(d.price>0)sub.avgPrice=d.price;
+          }
+        } else {
+          e.shares=+(e.shares+d.shares_to_buy).toFixed(4);
+          if(d.price>0)e.avgPrice=d.price;
+        }
       }
     });
   }
@@ -1909,12 +1922,19 @@ window.clearAllHistory=function(){
   state.history=[];save();renderHistory();updateHealthBar();
 };
 window.confirmFromHistory=function(idx){
-  const h=state.history[idx];h.confirmed=true;
+  const h=state.history[idx];if(!h)return;h.confirmed=true;
   h.orders.forEach(o=>{
-    const etf=state.etfs.find(e=>e.isin&&e.isin===o.isin)||state.etfs.find(e=>e.ticker===o.ticker);
-    if(etf)etf.shares=+(etf.shares+(o.shares||0)).toFixed(4);
+    // Matching solo
+    let etf=state.etfs.find(e=>(!e.subs||!e.subs.length)&&((e.isin&&o.isin&&e.isin===o.isin)||(e.ticker&&o.ticker&&e.ticker===o.ticker)));
+    if(etf){etf.shares=+(((etf.shares||0)+(o.shares||0))).toFixed(4);if(o.price>0)etf.avgPrice=o.price;return;}
+    // Matching dans un groupe (sous-ETF)
+    for(const e of state.etfs){
+      if(!e.subs||!e.subs.length)continue;
+      const sub=e.subs.find(s=>(s.isin&&o.isin&&s.isin===o.isin)||(s.ticker&&o.ticker&&s.ticker===o.ticker));
+      if(sub){sub.shares=+(((sub.shares||0)+(o.shares||0))).toFixed(4);if(o.price>0)sub.avgPrice=o.price;break;}
+    }
   });
-  save();renderHistory();updateHealthBar();renderAllocOverview();renderPieChart();renderQuickUpdate();
+  save();renderHistory();updateHealthBar();renderAllocOverview();renderPieChart();renderQuickUpdate();renderEtfGrid();
 };
 function detectIndex(name){const n=(name||'').toLowerCase();for(const kw of INDEX_KEYWORDS){if(n.includes(kw.toLowerCase()))return kw;}const words=n.replace(/[^a-z0-9\s]/g,' ').trim().split(/\s+/).filter(w=>w.length>2);return words.slice(0,2).join(' ')||name;}
 function groupByIndex(etfs){const groups={};etfs.forEach(etf=>{const idx=detectIndex(etf.name);if(!groups[idx])groups[idx]={indexName:idx,etfs:[]};groups[idx].etfs.push(etf);});return Object.values(groups).map(g=>({...g,etfs:g.etfs.sort((a,b)=>b.shares-a.shares)})).sort((a,b)=>b.etfs[0].shares-a.etfs[0].shares);}
@@ -2025,6 +2045,13 @@ function applyImport(replaceAll){
   else if(anyNew)msg='Import fusionné : nouveaux ETF ajoutés.';
   else if(anyChanged)msg='Import fusionné : parts mises à jour.';
   alert(msg);
+  // Actualiser automatiquement les prix juste après l'import, pour que le
+  // portefeuille importé soit immédiatement à jour (sans clic manuel).
+  const hasIds=state.etfs.some(e=>e.isin||e.ticker||(e.subs&&e.subs.some(s=>s.isin||s.ticker)));
+  if(hasIds){
+    setCalcStatus&&setCalcStatus('live','Récupération des prix…');
+    triggerRefresh().then(()=>{renderEtfGrid();renderMonthly();}).catch(()=>{});
+  }
 }
 let chartProj=null;
 // ── Simulation DCA partagée : génère la série temporelle ET l'état par ETF ──
