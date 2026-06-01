@@ -319,7 +319,10 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
   <div class="card" style="margin-top:.75rem;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
       <div class="card-title" style="margin-bottom:0;">Ordres</div>
-      <button class="btn-ghost" onclick="openImportModal()" style="font-size:11px;padding:4px 10px;">&#128229; Import CSV</button>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-ghost" id="clear-history-btn" onclick="clearAllHistory()" style="font-size:11px;padding:4px 10px;display:none;color:var(--red);border-color:rgba(248,113,113,.25);">Tout effacer</button>
+        <button class="btn-ghost" onclick="openImportModal()" style="font-size:11px;padding:4px 10px;">&#128229; Import CSV</button>
+      </div>
     </div>
     <div id="history-list"><div class="notice notice-info">Aucun ordre enregistré.</div></div>
   </div>
@@ -330,8 +333,20 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div class="card-title">Simulation DCA</div>
     <div class="proj-controls">
       <label>Durée</label><input type="range" id="proj-years" min="1" max="40" value="20" oninput="updateProj()"/><span class="proj-val" id="proj-years-val">20 ans</span>
-      <label>Épargne/mois</label><input type="range" id="proj-monthly" min="100" max="5000" step="50" value="500" oninput="updateProj()"/><span class="proj-val" id="proj-monthly-val">500 €</span>
+      <label>Épargne/mois</label><input type="range" id="proj-monthly" min="50" max="5000" step="25" value="500" oninput="onProjMonthlySlider()"/><span class="proj-val" id="proj-monthly-val">500 €</span>
       <label>Rendement/an</label><input type="range" id="proj-return" min="1" max="20" step="0.5" value="8" oninput="updateProj()"/><span class="proj-val" id="proj-return-val">8%</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);">
+      <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">Montant précis :</span>
+      <input type="number" id="proj-monthly-input" value="500" min="0" step="25" style="width:90px;text-align:right;padding:5px 8px;height:30px;font-size:13px;" oninput="onProjMonthlyInput()"/>
+      <span style="font-size:12px;color:var(--text3);font-family:var(--mono);">€</span>
+      <span style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:6px;">Pas du curseur :</span>
+      <select id="proj-monthly-step" onchange="onProjStepChange()" style="padding:5px 8px;height:30px;font-size:12px;">
+        <option value="15">15 €</option>
+        <option value="25" selected>25 €</option>
+        <option value="50">50 €</option>
+        <option value="100">100 €</option>
+      </select>
     </div>
     <div id="proj-start-wrap" style="display:none;margin-top:.75rem;padding:10px 13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);">
       <div style="display:flex;align-items:center;gap:10px;">
@@ -392,7 +407,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div id="import-preview"></div>
   </div>
 </div>
-<footer>Folia · v1.10.1 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.13.0 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
@@ -442,7 +457,8 @@ const DEFAULT_STATE={
   monthly:500,freq:'monthly',maxDefer:3,expectedReturn:8,
   history:[],deferredCash:0,nextId:0,rebalMode:'asap',rebalMonths:12,
   twelveDataKey:'',uiMode:'simple',lastCalcDate:null,pendingOrders:null,
-  subChoices:{} // {etfId: subIndex} — quel émetteur acheter pour chaque ETF groupe
+  subChoices:{}, // {etfId: subIndex} — quel émetteur acheter pour chaque ETF groupe
+  _deferCounters:{} // {etfId: nb de mois consécutifs où l'ETF a été reporté}
 };
 
 let state=load()||JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -1454,19 +1470,39 @@ async function calculate(){
     }
   }
 
+  // ── Report max : forcer l'achat des ETF reportés depuis trop longtemps ──
+  // Un ETF sous-pondéré que l'algo n'achète pas voit son report s'accumuler.
+  // Si ce report atteint maxDefer mois, on force l'achat d'au moins 1 part
+  // (si le budget le permet), pour ne pas laisser le cash dormir indéfiniment.
+  const maxDefer=state.maxDefer||3;
+  etfData.forEach(e=>{
+    if(purchases[e.id]>0)return;            // déjà acheté ce mois
+    if(!e.price||e.price>remaining)return;  // pas les moyens
+    const underweight=e.currentValue<e.idealValue-0.5;
+    if(!underweight)return;                 // pas sous-pondéré → pas concerné
+    const deferredMonths=(state._deferCounters&&state._deferCounters[e.id])||0;
+    if(deferredMonths+1>=maxDefer){          // +1 = ce mois-ci inclus
+      // Forcer l'achat d'une part malgré le léger dépassement de cible
+      purchases[e.id]+=1;
+      remaining-=e.price;
+      e._forced=true; // marquer pour l'affichage
+    }
+  });
+
   const decisions=etfData.map(etf=>{
     const s=purchases[etf.id];
-    if(s>0)return{...etf,shares_to_buy:s,spent:s*etf.price,action:'buy'};
+    if(s>0)return{...etf,shares_to_buy:s,spent:s*etf.price,action:'buy',forced:!!etf._forced};
     if(!etf.price)return{...etf,shares_to_buy:0,spent:0,action:'noPrice'};
     // Pas acheté : soit déjà à/au-dessus de la cible, soit reporté
     const underweight=etf.currentValue<etf.idealValue-0.5;
     if(!underweight)return{...etf,shares_to_buy:0,spent:0,action:'overweight'};
     // Sous-pondéré mais pas acheté → reporté
     const monthsNeeded=Math.ceil(etf.price/state.monthly);
+    const deferredMonths=(state._deferCounters&&state._deferCounters[etf.id])||0;
     const reason=etf.price>budget
       ?'part trop chère ('+etf.price.toFixed(2)+' € — budget actuel '+budget.toFixed(0)+' €)'
       :'achat reporté pour rester proche de la cible (cash accumulé pour le prochain achat)';
-    return{...etf,shares_to_buy:0,spent:0,action:'defer',reason,monthsNeeded};
+    return{...etf,shares_to_buy:0,spent:0,action:'defer',reason,monthsNeeded,deferredMonths:deferredMonths+1};
   });
   const totalSpent=budget-remaining;
   state.lastCalcDate=new Date().toISOString();
@@ -1523,6 +1559,7 @@ function renderPlanOrders(pending){
         +'<div style="display:flex;align-items:center;gap:8px;">'
         +'<span style="width:9px;height:9px;border-radius:50%;background:'+color+';display:inline-block;flex-shrink:0;"></span>'
         +'<span style="font-size:13px;font-weight:600;">'+( d.displayName||d.name)+'</span>'
+        +(d.forced?'<span style="font-size:9px;font-family:var(--mono);color:var(--amber);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);padding:1px 6px;border-radius:10px;">report max atteint</span>':'')
         +'</div>'
         +'<span style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--green);">'+d.spent.toFixed(2)+' €</span>'
         +'</div>'
@@ -1537,32 +1574,64 @@ function renderPlanOrders(pending){
   // ── Plan hebdomadaire (si fréquence = hebdo) ──────────────────────
   if(state.freq==='weekly'&&buys.length){
     const weeks=4; // 4 versements par mois
-    const {perEtf,weeklyTotal}=buildWeeklyPlan(buys,weeks);
-    html+='<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 6px;display:flex;align-items:center;gap:6px;">'
-      +'<span style="width:3px;height:11px;background:var(--accent);border-radius:2px;display:inline-block;"></span>Ordres programmés hebdomadaires</div>';
-    html+='<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:9px;line-height:1.45;">Pour chaque ETF, le <strong>montant en euros</strong> à programmer chaque semaine (×'+weeks+') sur Trade Republic. Il achètera le maximum de parts entières que ce montant permet.</div>';
+    const {weekly,single,weeklyTotal}=buildWeeklyPlan(buys,weeks);
 
-    perEtf.forEach(e=>{
-      html+='<div style="background:rgba(79,142,247,.04);border:1px solid rgba(79,142,247,.15);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;">'
-        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">'
-        +'<span style="width:9px;height:9px;border-radius:50%;background:'+e.color+';display:inline-block;flex-shrink:0;"></span>'
-        +'<span style="font-size:13px;font-weight:600;flex:1;">'+e.name+'</span>'
-        +'</div>'
-        +'<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:5px;">'
-        +'<span style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent);">'+e.weeklyEur.toFixed(2)+' €</span>'
-        +'<span style="font-size:12px;color:var(--text2);">/ semaine</span>'
-        +'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:auto;">≈ '+e.approxShares.toFixed(1)+' part'+(e.approxShares>=2?'s':'')+'/sem au cours actuel</span>'
-        +'</div>'
-        +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.4;border-top:1px solid var(--border);padding-top:6px;">'
-        +'Sur le mois : '+e.monthlyEur.toFixed(2)+' € investis dans cet ETF'
-        +'</div>'
+    // ── Bloc 1 : ordres programmés hebdomadaires (sans frais) ──
+    if(weekly.length){
+      html+='<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 6px;display:flex;align-items:center;gap:6px;">'
+        +'<span style="width:3px;height:11px;background:var(--accent);border-radius:2px;display:inline-block;"></span>À programmer chaque semaine</div>';
+      html+='<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:9px;line-height:1.45;">Ordres programmés Trade Republic (sans frais). Le montant achète le maximum de parts entières possible chaque semaine.</div>';
+      weekly.forEach(e=>{
+        html+='<div style="background:rgba(79,142,247,.04);border:1px solid rgba(79,142,247,.15);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">'
+          +'<span style="width:9px;height:9px;border-radius:50%;background:'+e.color+';display:inline-block;flex-shrink:0;"></span>'
+          +'<span style="font-size:13px;font-weight:600;flex:1;">'+e.name+'</span>'
+          +'</div>'
+          +'<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:5px;">'
+          +'<span style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent);">'+e.weeklyEur.toFixed(2)+' €</span>'
+          +'<span style="font-size:12px;color:var(--text2);">/ semaine</span>'
+          +'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:auto;">≈ '+e.approxShares.toFixed(1)+' part'+(e.approxShares>=2?'s':'')+'/sem</span>'
+          +'</div>'
+          +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.4;border-top:1px solid var(--border);padding-top:6px;">'
+          +'Sur le mois : '+e.monthlyEur.toFixed(2)+' € dans cet ETF'
+          +'</div>'
+          +'</div>';
+      });
+      html+='<div style="font-size:11px;font-family:var(--mono);color:var(--text2);margin-top:4px;padding:8px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);">'
+        +'Total programmé : <strong>'+weeklyTotal.toFixed(2)+' € / semaine</strong>'
         +'</div>';
-    });
-    html+='<div style="font-size:11px;font-family:var(--mono);color:var(--text2);margin-top:4px;padding:8px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);">'
-      +'Total à programmer : <strong>'+weeklyTotal.toFixed(2)+' € / semaine</strong> · '+(weeklyTotal*weeks).toFixed(2)+' € / mois'
-      +'</div>';
+    }
+
+    // ── Bloc 2 : achats uniques en début de mois (trop chers pour l'hebdo, avec frais) ──
+    if(single.length){
+      html+='<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 6px;display:flex;align-items:center;gap:6px;">'
+        +'<span style="width:3px;height:11px;background:var(--green);border-radius:2px;display:inline-block;"></span>À acheter en une fois ce mois-ci</div>';
+      html+='<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:9px;line-height:1.45;">Ces ETF sont trop chers pour un étalement hebdomadaire (moins d\'une part par semaine). Achète-les en un ordre ponctuel en début de mois. <strong>1 € de frais</strong> s\'applique par ordre (déjà déduit ci-dessous).</div>';
+      single.forEach(e=>{
+        html+='<div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.18);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;">'
+          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">'
+          +'<span style="width:9px;height:9px;border-radius:50%;background:'+e.color+';display:inline-block;flex-shrink:0;"></span>'
+          +'<span style="font-size:13px;font-weight:600;flex:1;">'+e.name+'</span>'
+          +'</div>';
+        if(e.shares>0){
+          html+='<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:5px;">'
+            +'<span style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--green);">'+e.shares+'</span>'
+            +'<span style="font-size:12px;color:var(--text2);">part'+(e.shares>1?'s':'')+' en une fois</span>'
+            +'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:auto;">'+e.cost.toFixed(2)+' € + 1 € frais = '+e.totalCost.toFixed(2)+' €</span>'
+            +'</div>'
+            +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.4;border-top:1px solid var(--border);padding-top:6px;">'
+            +'Budget alloué : '+e.monthlyEur.toFixed(2)+' € · prix unitaire '+e.price.toFixed(2)+' €'
+            +(e.leftover>0.009?' · '+e.leftover.toFixed(2)+' € reportés':'')
+            +'</div>';
+        } else {
+          html+='<div style="font-size:11px;font-family:var(--mono);color:var(--amber);line-height:1.4;">Budget insuffisant ce mois-ci ('+e.monthlyEur.toFixed(2)+' € alloués, part à '+e.price.toFixed(2)+' € + 1 € de frais). Reporté au mois prochain.</div>';
+        }
+        html+='</div>';
+      });
+    }
+
     html+='<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:7px;line-height:1.45;">'
-      +'⚠ En PEA, Trade Republic n\'achète que des parts entières : chaque semaine, le montant non utilisé (inférieur au prix d\'une part) n\'est pas investi. Sur le mois, le total réellement investi peut donc être légèrement inférieur au plan.</div>';
+      +'⚠ En PEA, seules les parts entières sont achetées : le montant non utilisé chaque semaine n\'est pas investi et se reporte. Le total réellement investi peut donc être légèrement inférieur au plan.</div>';
   }
 
   // ── Reportés ──────────────────────────────────────────────────────
@@ -1614,21 +1683,30 @@ function renderConfirmList(pending){
 // Pour chaque ETF, on prend le montant prévu ce mois-ci (spent) et on le divise
 // par le nombre de semaines → montant à programmer chaque semaine.
 // Trade Republic achète ensuite le maximum de parts entières que ce montant permet.
+const FEE_PER_ORDER=1; // frais Trade Republic sur un ordre ponctuel manuel (€)
 function buildWeeklyPlan(buys,weeks){
-  const perEtf=buys.map(d=>{
-    const monthlyEur=d.spent;                 // montant prévu ce mois pour cet ETF
-    const weeklyEur=monthlyEur/weeks;         // montant à programmer par semaine
-    return {
-      name:d.displayName||d.name,
-      color:COLORS_INDEX(d),
-      price:d.price,
-      monthlyEur,
-      weeklyEur,
-      approxShares:d.price>0?weeklyEur/d.price:0 // estimation indicative de parts/sem
-    };
+  const weekly=[],single=[];
+  buys.forEach(d=>{
+    const monthlyEur=d.spent;
+    const weeklyEur=monthlyEur/weeks;
+    const price=d.price;
+    const color=COLORS_INDEX(d);
+    const name=d.displayName||d.name;
+    // Peut-on acheter au moins 1 part chaque semaine avec le montant hebdo ?
+    if(price>0&&weeklyEur>=price){
+      weekly.push({name,color,price,monthlyEur,weeklyEur,approxShares:weeklyEur/price});
+    } else {
+      // ETF trop cher pour un étalement hebdo → achat unique en début de mois.
+      // On retire les frais (1€) du budget avant de calculer les parts.
+      const budgetAfterFee=Math.max(0,monthlyEur-FEE_PER_ORDER);
+      const sharesAtOnce=price>0?Math.floor(budgetAfterFee/price):0;
+      const cost=sharesAtOnce*price;
+      const leftover=monthlyEur-cost-(sharesAtOnce>0?FEE_PER_ORDER:0);
+      single.push({name,color,price,monthlyEur,shares:sharesAtOnce,cost,fee:sharesAtOnce>0?FEE_PER_ORDER:0,totalCost:cost+(sharesAtOnce>0?FEE_PER_ORDER:0),leftover});
+    }
   });
-  const weeklyTotal=perEtf.reduce((s,e)=>s+e.weeklyEur,0);
-  return {perEtf,weeks,weeklyTotal};
+  const weeklyTotal=weekly.reduce((s,e)=>s+e.weeklyEur,0);
+  return {weekly,single,weeks,weeklyTotal};
 }
 function COLORS_INDEX(d){
   const r=state.pendingOrders?.results||[];
@@ -1656,6 +1734,15 @@ function confirmOrders(){
       }
     });
   }
+  // Mettre à jour les compteurs de report (pour la logique "Report max")
+  if(!state._deferCounters)state._deferCounters={};
+  results.forEach(d=>{
+    if(d.action==='buy'){
+      state._deferCounters[d.id]=0;              // acheté → compteur remis à zéro
+    } else if(d.action==='defer'){
+      state._deferCounters[d.id]=(state._deferCounters[d.id]||0)+1; // reporté → +1
+    }
+  });
   // Le cash reporté devient réel maintenant que les ordres sont confirmés
   state.deferredCash=remaining;
   state.pendingOrders=null;save();document.getElementById('confirm-card').classList.remove('visible');renderMonthly();
@@ -1751,6 +1838,8 @@ async function testTdKey(){/* Twelve Data retiré — prix récupérés automati
 let chartHistory=null;
 function renderHistory(){
   const list=document.getElementById('history-list');
+  const clearBtn=document.getElementById('clear-history-btn');
+  if(clearBtn)clearBtn.style.display=state.history.length?'inline-block':'none';
   if(!state.history.length){list.innerHTML='<div class="notice notice-info">Aucun ordre enregistré.</div>';return;}
   list.innerHTML=state.history.map((h,idx)=>{
     const d=new Date(h.date);const ds=d.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});const ts=d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
@@ -1789,12 +1878,35 @@ function renderHistory(){
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8a8f9e',font:{family:'IBM Plex Mono',size:11}}}},scales:{x:{ticks:{color:'#555a66',font:{family:'IBM Plex Mono',size:11}},grid:{color:'#2a2d33'}},y:{ticks:{color:'#555a66',font:{family:'IBM Plex Mono',size:11},callback:v=>v.toLocaleString('fr-FR')+'€'},grid:{color:'#2a2d33'}}}}});
 }
 window.deleteHistory=function(idx){
-  const h=state.history[idx];if(!confirm('Supprimer ?'))return;
-  if(h.confirmed)h.orders.forEach(o=>{
-    const etf=state.etfs.find(e=>e.isin&&e.isin===o.isin)||state.etfs.find(e=>e.ticker===o.ticker);
-    if(etf)etf.shares=Math.max(0,+(etf.shares-(o.shares||0)).toFixed(4));
+  const h=state.history[idx];if(!h)return;
+  if(!confirm('Supprimer cette entrée d\'historique ?'))return;
+  pushUndo('suppression d\'une entrée d\'historique');
+  // Si l'ordre était confirmé, on retire les parts correspondantes du portefeuille
+  if(h.confirmed&&h.orders)h.orders.forEach(o=>{
+    let etf=state.etfs.find(e=>e.isin&&o.isin&&e.isin===o.isin)
+          ||state.etfs.find(e=>e.ticker&&o.ticker&&e.ticker===o.ticker);
+    // ETF groupés : chercher dans les sous-ETF
+    if(!etf){
+      for(const e of state.etfs){
+        if(e.subs&&e.subs.some(s=>(s.isin&&s.isin===o.isin)||(s.ticker&&s.ticker===o.ticker))){etf=e;break;}
+      }
+    }
+    if(etf){
+      if(etf.subs&&etf.subs.length){
+        const sub=etf.subs.find(s=>(s.isin&&s.isin===o.isin)||(s.ticker&&s.ticker===o.ticker));
+        if(sub)sub.shares=Math.max(0,+(((sub.shares||0)-(o.shares||0))).toFixed(4));
+      } else {
+        etf.shares=Math.max(0,+(((etf.shares||0)-(o.shares||0))).toFixed(4));
+      }
+    }
   });
-  state.history.splice(idx,1);save();renderHistory();updateHealthBar();
+  state.history.splice(idx,1);save();renderHistory();renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();
+};
+window.clearAllHistory=function(){
+  if(!state.history.length)return;
+  if(!confirm('Effacer tout l\'historique ? Les parts de ton portefeuille ne seront PAS modifiées — seules les entrées d\'historique sont supprimées.'))return;
+  pushUndo('effacement de tout l\'historique');
+  state.history=[];save();renderHistory();updateHealthBar();
 };
 window.confirmFromHistory=function(idx){
   const h=state.history[idx];h.confirmed=true;
@@ -1966,9 +2078,31 @@ function simulateDCA(monthly,months,annualReturn){
   }
   return {ok:true,series,finalEtfs:sim};
 }
-function syncProjSliders(){document.getElementById('proj-monthly').value=state.monthly;document.getElementById('proj-monthly-val').textContent=state.monthly+' €';const r=state.expectedReturn||8;document.getElementById('proj-return').value=r;document.getElementById('proj-return-val').textContent=r+'%';}
+// Synchronisation curseur ↔ champ ↔ pas pour l'épargne/mois en Projection
+function onProjMonthlySlider(){
+  const v=+document.getElementById('proj-monthly').value;
+  document.getElementById('proj-monthly-input').value=v;
+  updateProj();
+}
+function onProjMonthlyInput(){
+  let v=+document.getElementById('proj-monthly-input').value||0;
+  if(v<0)v=0;
+  const sl=document.getElementById('proj-monthly');
+  // Caler le curseur sur la valeur (en restant dans ses bornes pour l'affichage)
+  sl.value=Math.min(Math.max(v,+sl.min),+sl.max);
+  updateProj();
+}
+function onProjStepChange(){
+  const step=+document.getElementById('proj-monthly-step').value;
+  document.getElementById('proj-monthly').step=step;
+  document.getElementById('proj-monthly-input').step=step;
+}
+function syncProjSliders(){document.getElementById('proj-monthly').value=state.monthly;document.getElementById('proj-monthly-val').textContent=state.monthly+' €';const mi=document.getElementById('proj-monthly-input');if(mi)mi.value=state.monthly;const r=state.expectedReturn||8;document.getElementById('proj-return').value=r;document.getElementById('proj-return-val').textContent=r+'%';}
 function updateProj(){
-  const years=+document.getElementById('proj-years').value,monthly=+document.getElementById('proj-monthly').value,ret=+document.getElementById('proj-return').value;
+  const years=+document.getElementById('proj-years').value,ret=+document.getElementById('proj-return').value;
+  // L'épargne : le champ manuel est la source de vérité (il peut dépasser le max du curseur)
+  const mInput=document.getElementById('proj-monthly-input');
+  const monthly=mInput?(+mInput.value||0):(+document.getElementById('proj-monthly').value);
   document.getElementById('proj-years-val').textContent=years+' ans';document.getElementById('proj-monthly-val').textContent=monthly+' €';document.getElementById('proj-return-val').textContent=ret+'%';
   // Le slider de rendement est la source de vérité — on le mémorise
   state.expectedReturn=ret;save();
@@ -2005,7 +2139,17 @@ function updateProj(){
     ?'<span style="font-size:10px;font-family:var(--mono);color:var(--green);">● simulation détaillée par ETF</span>'
     :'<span style="font-size:10px;font-family:var(--mono);color:var(--text3);">● estimation globale (ajoute des ETF avec prix pour affiner)</span>';
   document.getElementById('proj-metrics').innerHTML='<div style="grid-column:1/-1;margin-bottom:6px;">'+modeLabel+'</div><div class="metric"><div class="metric-label">valeur finale</div><div class="metric-value blue">'+fv.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">total investi</div><div class="metric-value">'+fi.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">plus-value</div><div class="metric-value green">+'+(fv-fi).toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">multiplicateur</div><div class="metric-value purple">×'+(fv/Math.max(fi,1)).toFixed(1)+'</div></div>';
-  const ctx=document.getElementById('chart-proj');if(chartProj)chartProj.destroy();
+  const ctx=document.getElementById('chart-proj');
+  // Mémoriser quelles courbes l'utilisateur avait masquées (cliquées dans la légende)
+  // pour les restaurer après recréation du graphique (sinon elles réapparaissent).
+  let hiddenLabels=[];
+  if(chartProj){
+    chartProj.data.datasets.forEach((ds,idx)=>{
+      const meta=chartProj.getDatasetMeta(idx);
+      if(meta&&meta.hidden)hiddenLabels.push(ds.label);
+    });
+    chartProj.destroy();
+  }
   const eur=v=>Math.round(v).toLocaleString('fr-FR')+' €';
   chartProj=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'Optimiste ('+(ret*1.5).toFixed(1)+'%)',data:opt,borderColor:'rgba(52,211,153,.4)',fill:false,tension:.4,pointRadius:0,pointHoverRadius:4,borderDash:[3,3]},{label:'Base ('+ret+'%)',data:base,borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,.07)',fill:true,tension:.4,pointRadius:0,pointHoverRadius:5,borderWidth:2},{label:'Prudent ('+(ret*0.5).toFixed(1)+'%)',data:pess,borderColor:'rgba(251,191,36,.4)',fill:false,tension:.4,pointRadius:0,pointHoverRadius:4,borderDash:[3,3]},{label:'Investi',data:invested,borderColor:'#555a66',fill:false,tension:0,pointRadius:0,pointHoverRadius:4,borderDash:[6,4]}]},options:{
     responsive:true,maintainAspectRatio:false,
@@ -2025,6 +2169,16 @@ function updateProj(){
     },
     scales:{x:{ticks:{color:'#555a66',font:{family:'IBM Plex Mono',size:11}},grid:{color:'#1c1e22'}},y:{ticks:{color:'#555a66',font:{family:'IBM Plex Mono',size:11},callback:v=>Math.round(v).toLocaleString('fr-FR')+'€'},grid:{color:'#1c1e22'}}}
   }});
+  // Réappliquer les courbes que l'utilisateur avait masquées avant le changement de durée
+  if(hiddenLabels.length){
+    chartProj.data.datasets.forEach((ds,idx)=>{
+      if(hiddenLabels.includes(ds.label)){
+        const meta=chartProj.getDatasetMeta(idx);
+        meta.hidden=true;
+      }
+    });
+    chartProj.update();
+  }
   const PV=Math.max(0,fv-fi),PS=0.186,FT=0.314,netA=fv-PV*PS,netB=fv-PV*FT,fmt=v=>Math.round(v).toLocaleString('fr-FR');
   const fc=document.getElementById('proj-fiscal-card');
   fc.innerHTML='<div class="card-title">Fiscalité PEA à la sortie</div>'
@@ -2111,6 +2265,7 @@ window.setMode=setMode;window.saveQuickUpdate=saveQuickUpdate;
 window.openImportModal=openImportModal;window.closeImportModal=closeImportModal;
 window.handleCsvFile=handleCsvFile;window.applyImport=applyImport;
 window.updateProj=updateProj;window.testTdKey=testTdKey;
+window.onProjMonthlySlider=onProjMonthlySlider;window.onProjMonthlyInput=onProjMonthlyInput;window.onProjStepChange=onProjStepChange;
 window.openSettings=openSettings;window.closeSettings=closeSettings;window.resetAllData=resetAllData;
 window.closePosCheck=closePosCheck;window.confirmPosCheck=confirmPosCheck;
 window.exportData=exportData;window.importData=importData;
