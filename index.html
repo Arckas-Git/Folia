@@ -360,6 +360,11 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     </div>
     <div>
       <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Données</div>
+      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-bottom:9px;">Tes données sont enregistrées dans ce navigateur. Exporte une sauvegarde pour les conserver ailleurs ou les transférer sur un autre appareil.</div>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="exportData()">&#11015; Exporter mes données (sauvegarde)</button>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="document.getElementById('import-data-file').click()">&#11014; Importer une sauvegarde</button>
+      <input type="file" id="import-data-file" accept="application/json,.json" style="display:none;" onchange="importData(this.files[0])"/>
+      <div id="data-io-status" style="font-size:11px;font-family:var(--mono);min-height:14px;margin-bottom:8px;"></div>
       <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="openImportModal();closeSettings()">&#128229; Importer CSV Trade Republic</button>
       <button onclick="resetAllData()" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--red);font-size:12px;padding:7px;border-radius:var(--r);width:100%;">&#9888; Réinitialiser toutes les données</button>
     </div>
@@ -375,7 +380,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div id="import-preview"></div>
   </div>
 </div>
-<footer>Folia · v1.3.0 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.4.0 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
@@ -1465,6 +1470,56 @@ function setCalcStatus(type,msg){document.getElementById('calc-dot').className='
 function syncSettingsFromInputs(){state.monthly=+document.getElementById('monthly').value||500;state.maxDefer=+document.getElementById('max-defer').value||3;state.rebalMode=document.getElementById('rebal-mode').value;state.rebalMonths=+document.getElementById('rebal-months').value||12;save();}
 function openSettings(){document.getElementById('settings-overlay').style.display='flex';}
 function closeSettings(){document.getElementById('settings-overlay').style.display='none';}
+function _dataIoStatus(msg,color){const el=document.getElementById('data-io-status');if(el){el.style.color=color||'var(--text3)';el.textContent=msg;}}
+// Exporter toutes les données dans un fichier de sauvegarde JSON téléchargeable
+function exportData(){
+  try{
+    const payload={app:'Folia',type:'folia-backup',version:1,exportedAt:new Date().toISOString(),state:state};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const d=new Date().toISOString().slice(0,10);
+    a.href=url;a.download='folia-sauvegarde-'+d+'.json';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    _dataIoStatus('✓ Sauvegarde téléchargée','var(--green)');
+  }catch(e){_dataIoStatus('✕ Échec de l\'export','var(--red)');}
+}
+// Importer une sauvegarde JSON (remplace les données actuelles après confirmation)
+function importData(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    let parsed=null;
+    try{parsed=JSON.parse(e.target.result);}catch(_){_dataIoStatus('✕ Fichier illisible (JSON invalide)','var(--red)');return;}
+    // Accepter soit notre format {type:'folia-backup',state:...}, soit un state brut
+    const incoming=(parsed&&parsed.type==='folia-backup'&&parsed.state)?parsed.state:parsed;
+    if(!incoming||typeof incoming!=='object'||!Array.isArray(incoming.etfs)){
+      _dataIoStatus('✕ Ce fichier n\'est pas une sauvegarde Folia valide','var(--red)');
+      return;
+    }
+    if(!confirm('Importer cette sauvegarde ? Tes données actuelles seront remplacées.'))return;
+    try{
+      // Fusionner sur DEFAULT_STATE pour garantir toutes les clés attendues
+      const fresh=JSON.parse(JSON.stringify(DEFAULT_STATE));
+      const merged=Object.assign(fresh,incoming);
+      Object.keys(state).forEach(k=>delete state[k]);
+      Object.assign(state,merged);
+      uiMode=state.uiMode||'simple';
+      save();
+      // Re-render complet
+      document.getElementById('monthly').value=state.monthly;
+      document.getElementById('max-defer').value=state.maxDefer;
+      document.getElementById('rebal-mode').value=state.rebalMode||'asap';
+      document.getElementById('rebal-months').value=state.rebalMonths||12;
+      renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();updateProj();
+      startAutoRefresh();
+      _dataIoStatus('✓ Sauvegarde importée avec succès','var(--green)');
+    }catch(err){_dataIoStatus('✕ Échec de l\'import','var(--red)');}
+  };
+  reader.onerror=()=>_dataIoStatus('✕ Impossible de lire le fichier','var(--red)');
+  reader.readAsText(file,'utf-8');
+}
 function resetAllData(){
   if(!confirm('Réinitialiser toutes les données ? Cette action est irréversible.'))return;
   // 1. Effacer localStorage — toutes les clés connues
@@ -1849,6 +1904,7 @@ window.openImportModal=openImportModal;window.closeImportModal=closeImportModal;
 window.handleCsvFile=handleCsvFile;window.applyImport=applyImport;
 window.updateProj=updateProj;window.testTdKey=testTdKey;
 window.openSettings=openSettings;window.closeSettings=closeSettings;window.resetAllData=resetAllData;
+window.exportData=exportData;window.importData=importData;
 window.confirmOrders=confirmOrders;window.skipConfirm=skipConfirm;
 renderEtfGrid();
 renderMonthly();
