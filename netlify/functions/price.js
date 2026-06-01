@@ -37,6 +37,37 @@ async function fetchYahooPrice(symbol) {
   };
 }
 
+// Récupère l'historique max (mensuel) d'un symbole et calcule le rendement
+// annualisé (CAGR) sur toute la période disponible.
+// Retourne { cagr, years, symbol, startPrice, endPrice } ou null.
+async function fetchYahooHistory(symbol) {
+  const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol) + '?interval=1mo&range=max';
+  const r = await fetch(url, { headers: YH_HEADERS });
+  if (!r.ok) return null;
+  const d = await r.json();
+  const res = d && d.chart && d.chart.result && d.chart.result[0];
+  if (!res || !res.timestamp || !res.indicators) return null;
+  // Prix de clôture ajustés si dispo (tiennent compte des dividendes/splits), sinon close brut
+  const adj = res.indicators.adjclose && res.indicators.adjclose[0] && res.indicators.adjclose[0].adjclose;
+  const close = res.indicators.quote && res.indicators.quote[0] && res.indicators.quote[0].close;
+  const prices = (adj || close || []).filter(p => p != null && p > 0);
+  const ts = res.timestamp || [];
+  if (prices.length < 13) return null; // moins d'un an de données → pas assez fiable
+  const startPrice = prices[0];
+  const endPrice = prices[prices.length - 1];
+  const startTs = ts[0], endTs = ts[ts.length - 1];
+  const years = (endTs - startTs) / (365.25 * 24 * 3600);
+  if (years < 1 || startPrice <= 0) return null;
+  // CAGR = (valeur finale / valeur initiale)^(1/années) − 1
+  const cagr = (Math.pow(endPrice / startPrice, 1 / years) - 1) * 100;
+  return {
+    cagr: Math.round(cagr * 100) / 100,
+    years: Math.round(years * 10) / 10,
+    symbol: (res.meta && res.meta.symbol) || symbol,
+    usedAdjusted: !!adj,
+  };
+}
+
 // Résout un ISIN en symbole Yahoo via l'outil de recherche de Yahoo.
 // Privilégie une cotation européenne pour éviter les homonymes US.
 async function resolveIsin(isin) {
@@ -68,6 +99,7 @@ exports.handler = async function (event) {
     const params = (event && event.queryStringParameters) || {};
     const isin = (params.isin || '').trim().toUpperCase();
     let ticker = (params.ticker || '').trim().toUpperCase();
+    const wantHistory = params.history === '1' || params.history === 'true';
 
     if (!isin && !ticker) {
       return { statusCode: 200, headers, body: JSON.stringify({ error: 'Aucun ISIN ni ticker fourni' }) };
@@ -86,6 +118,25 @@ exports.handler = async function (event) {
         candidates.push(ticker + '.AS');
         candidates.push(ticker);
       }
+    }
+
+    // ── Mode HISTORIQUE : renvoyer le rendement annualisé (CAGR) ──
+    if (wantHistory) {
+      // Trouver d'abord un symbole valide (via ticker puis ISIN)
+      let symbol = null;
+      for (const sym of candidates) {
+        const info = await fetchYahooPrice(sym);
+        if (info && info.price) { symbol = info.symbol; break; }
+      }
+      if (!symbol && isin) symbol = await resolveIsin(isin);
+      if (!symbol) {
+        return { statusCode: 200, headers, body: JSON.stringify({ error: 'Symbole introuvable pour l\'historique' }) };
+      }
+      const hist = await fetchYahooHistory(symbol);
+      if (!hist) {
+        return { statusCode: 200, headers, body: JSON.stringify({ error: 'Historique insuffisant', symbol }) };
+      }
+      return { statusCode: 200, headers, body: JSON.stringify(hist) };
     }
 
     // Essayer les candidats ticker
