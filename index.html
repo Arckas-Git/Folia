@@ -381,7 +381,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div id="import-preview"></div>
   </div>
 </div>
-<footer>Folia · v1.8.0 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.9.0 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
@@ -1441,41 +1441,33 @@ function renderPlanOrders(pending){
 
   // ── Plan hebdomadaire (si fréquence = hebdo) ──────────────────────
   if(state.freq==='weekly'&&buys.length){
-    const weeks=4; // 4 achats par mois
-    const {perEtf}=buildWeeklyPlan(buys,weeks);
-    const programmable=perEtf.filter(e=>e.perWeek>0);
+    const weeks=4; // 4 versements par mois
+    const {perEtf,weeklyTotal}=buildWeeklyPlan(buys,weeks);
     html+='<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 6px;display:flex;align-items:center;gap:6px;">'
       +'<span style="width:3px;height:11px;background:var(--accent);border-radius:2px;display:inline-block;"></span>Ordres programmés hebdomadaires</div>';
-    html+='<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:9px;line-height:1.45;">Pour chaque ETF, un nombre de parts <strong>constant chaque semaine</strong> (×'+weeks+'), à programmer une fois sur Trade Republic. Le coût réel variera selon le cours du jour.</div>';
+    html+='<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:9px;line-height:1.45;">Pour chaque ETF, le <strong>montant en euros</strong> à programmer chaque semaine (×'+weeks+') sur Trade Republic. Il achètera le maximum de parts entières que ce montant permet.</div>';
 
-    if(!programmable.length){
-      html+='<div style="font-size:11px;font-family:var(--mono);color:var(--amber);padding:8px 11px;background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.15);border-radius:var(--r);">Aucun ETF n\'atteint 1 part par semaine ce mois-ci (budget trop faible pour un étalement hebdomadaire). Le plan mensuel en un seul achat reste préférable.</div>';
-    } else {
-      programmable.forEach(e=>{
-        html+='<div style="background:rgba(79,142,247,.04);border:1px solid rgba(79,142,247,.15);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;">'
-          +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">'
-          +'<span style="width:9px;height:9px;border-radius:50%;background:'+e.color+';display:inline-block;flex-shrink:0;"></span>'
-          +'<span style="font-size:13px;font-weight:600;flex:1;">'+e.name+'</span>'
-          +'</div>'
-          +'<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:5px;">'
-          +'<span style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent);">'+e.perWeek+'</span>'
-          +'<span style="font-size:12px;color:var(--text2);">part'+(e.perWeek>1?'s':'')+' / semaine</span>'
-          +'<span style="font-size:12px;font-family:var(--mono);color:var(--text3);margin-left:auto;">≈ '+e.weekCost.toFixed(2)+' € / sem.</span>'
-          +'</div>'
-          +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.4;border-top:1px solid var(--border);padding-top:6px;">'
-          +'Sur le mois : '+e.covered+' part'+(e.covered>1?'s':'')+' ≈ '+(e.covered*e.price).toFixed(2)+' €'
-          +(e.leftover>0?' · <span style="color:var(--amber);">'+e.leftover+' part'+(e.leftover>1?'s':'')+' reportée'+(e.leftover>1?'s':'')+' au mois prochain</span>':'')
-          +'</div>'
-          +'</div>';
-      });
-      // ETF du plan mensuel qui ne tiennent pas en hebdo (moins de 4 parts)
-      const tooSmall=perEtf.filter(e=>e.perWeek===0);
-      if(tooSmall.length){
-        html+='<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:4px;line-height:1.45;">'
-          +'À acheter en un seul ordre ce mois-ci (moins de 4 parts, pas d\'étalement hebdo possible) : '
-          +tooSmall.map(e=>e.name+' ('+e.total+')').join(', ')+'.</div>';
-      }
-    }
+    perEtf.forEach(e=>{
+      html+='<div style="background:rgba(79,142,247,.04);border:1px solid rgba(79,142,247,.15);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;">'
+        +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">'
+        +'<span style="width:9px;height:9px;border-radius:50%;background:'+e.color+';display:inline-block;flex-shrink:0;"></span>'
+        +'<span style="font-size:13px;font-weight:600;flex:1;">'+e.name+'</span>'
+        +'</div>'
+        +'<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:5px;">'
+        +'<span style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent);">'+e.weeklyEur.toFixed(2)+' €</span>'
+        +'<span style="font-size:12px;color:var(--text2);">/ semaine</span>'
+        +'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:auto;">≈ '+e.approxShares.toFixed(1)+' part'+(e.approxShares>=2?'s':'')+'/sem au cours actuel</span>'
+        +'</div>'
+        +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.4;border-top:1px solid var(--border);padding-top:6px;">'
+        +'Sur le mois : '+e.monthlyEur.toFixed(2)+' € investis dans cet ETF'
+        +'</div>'
+        +'</div>';
+    });
+    html+='<div style="font-size:11px;font-family:var(--mono);color:var(--text2);margin-top:4px;padding:8px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);">'
+      +'Total à programmer : <strong>'+weeklyTotal.toFixed(2)+' € / semaine</strong> · '+(weeklyTotal*weeks).toFixed(2)+' € / mois'
+      +'</div>';
+    html+='<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:7px;line-height:1.45;">'
+      +'⚠ En PEA, Trade Republic n\'achète que des parts entières : chaque semaine, le montant non utilisé (inférieur au prix d\'une part) n\'est pas investi. Sur le mois, le total réellement investi peut donc être légèrement inférieur au plan.</div>';
   }
 
   // ── Reportés ──────────────────────────────────────────────────────
@@ -1523,24 +1515,25 @@ function renderConfirmList(pending){
   const el=document.getElementById('confirm-orders-list');const buys=pending.results.filter(d=>d.action==='buy');
   el.innerHTML=buys.map(d=>'<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;">'+(d.displayName||d.name)+'</span><span style="font-size:12px;font-family:var(--mono);font-weight:600;color:var(--green);">'+d.shares_to_buy+'× · '+d.spent.toFixed(2)+' €</span></div>').join('');
 }
-// Plan hebdomadaire : pour chaque ETF, un nombre de parts CONSTANT par semaine.
-// On divise le total mensuel par le nombre de semaines et on arrondit à l'INFÉRIEUR
-// (jamais dépasser le budget). Le reliquat se reporte au mois suivant.
+// Plan hebdomadaire en EUROS (adapté aux ordres programmés Trade Republic).
+// Pour chaque ETF, on prend le montant prévu ce mois-ci (spent) et on le divise
+// par le nombre de semaines → montant à programmer chaque semaine.
+// Trade Republic achète ensuite le maximum de parts entières que ce montant permet.
 function buildWeeklyPlan(buys,weeks){
   const perEtf=buys.map(d=>{
-    const total=d.shares_to_buy;
-    const perWeek=Math.floor(total/weeks);   // parts constantes par semaine
-    const covered=perWeek*weeks;             // parts réellement achetées via le plan hebdo
-    const leftover=total-covered;            // reliquat reporté
+    const monthlyEur=d.spent;                 // montant prévu ce mois pour cet ETF
+    const weeklyEur=monthlyEur/weeks;         // montant à programmer par semaine
     return {
       name:d.displayName||d.name,
       color:COLORS_INDEX(d),
       price:d.price,
-      total,perWeek,covered,leftover,
-      weekCost:perWeek*d.price
+      monthlyEur,
+      weeklyEur,
+      approxShares:d.price>0?weeklyEur/d.price:0 // estimation indicative de parts/sem
     };
   });
-  return {perEtf,weeks};
+  const weeklyTotal=perEtf.reduce((s,e)=>s+e.weeklyEur,0);
+  return {perEtf,weeks,weeklyTotal};
 }
 function COLORS_INDEX(d){
   const r=state.pendingOrders?.results||[];
