@@ -17,6 +17,32 @@ const YH_HEADERS = {
 // Suffixes des places européennes, par ordre de préférence (Paris d'abord)
 const EURO_SUFFIXES = ['.PA', '.DE', '.AS', '.L', '.MI', '.BR', '.LS', '.MC'];
 
+// ── Cache mémoire mutualisé entre tous les utilisateurs ──────────────
+// La fonction serverless garde son conteneur "chaud" entre les invocations :
+// un cache en mémoire est donc partagé par tous les appels qui tombent sur le
+// même conteneur. Comme tout le monde suit les mêmes grands ETF (World, S&P 500…),
+// ça évite de rappeler Yahoo pour un prix déjà connu — on économise les ressources.
+// Les cours Yahoo sont des clôtures quotidiennes : un cache de quelques heures
+// ne fait perdre aucune fraîcheur réelle.
+const _cache = {};            // { clé: { data, exp } }
+const PRICE_TTL = 6 * 60 * 60 * 1000;   // prix : 6 h
+const HISTORY_TTL = 24 * 60 * 60 * 1000; // historique (CAGR) : 24 h (change très peu)
+function cacheGet(key) {
+  const hit = _cache[key];
+  if (hit && hit.exp > Date.now()) return hit.data;
+  if (hit) delete _cache[key]; // expiré → on nettoie
+  return null;
+}
+function cacheSet(key, data, ttl) {
+  _cache[key] = { data, exp: Date.now() + ttl };
+  // Garde-fou anti-fuite mémoire : si le cache grossit trop, on purge les plus vieux.
+  const keys = Object.keys(_cache);
+  if (keys.length > 500) {
+    keys.sort((a, b) => _cache[a].exp - _cache[b].exp).slice(0, 100).forEach(k => delete _cache[k]);
+  }
+  return data;
+}
+
 // Récupère le prix d'un symbole Yahoo précis via l'endpoint v8/chart
 async function fetchYahooPrice(symbol) {
   const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(symbol) + '?interval=1d&range=5d';
@@ -105,6 +131,14 @@ exports.handler = async function (event) {
       return { statusCode: 200, headers, body: JSON.stringify({ error: 'Aucun ISIN ni ticker fourni' }) };
     }
 
+    // Clé de cache : identifiant + type de requête (prix vs historique)
+    const cacheKey = (wantHistory ? 'h:' : 'p:') + (isin || '') + '|' + (ticker || '');
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      // Servi depuis le cache mutualisé — aucun appel à Yahoo
+      return { statusCode: 200, headers, body: JSON.stringify({ ...cached, cached: true }) };
+    }
+
     // ── Construire la liste des symboles à essayer, dans l'ordre ──
     const candidates = [];
 
@@ -136,6 +170,7 @@ exports.handler = async function (event) {
       if (!hist) {
         return { statusCode: 200, headers, body: JSON.stringify({ error: 'Historique insuffisant', symbol }) };
       }
+      cacheSet(cacheKey, hist, HISTORY_TTL);
       return { statusCode: 200, headers, body: JSON.stringify(hist) };
     }
 
@@ -143,6 +178,7 @@ exports.handler = async function (event) {
     for (const sym of candidates) {
       const info = await fetchYahooPrice(sym);
       if (info && info.price) {
+        cacheSet(cacheKey, info, PRICE_TTL);
         return { statusCode: 200, headers, body: JSON.stringify(info) };
       }
     }
@@ -153,6 +189,7 @@ exports.handler = async function (event) {
       if (sym) {
         const info = await fetchYahooPrice(sym);
         if (info && info.price) {
+          cacheSet(cacheKey, info, PRICE_TTL);
           return { statusCode: 200, headers, body: JSON.stringify(info) };
         }
       }
