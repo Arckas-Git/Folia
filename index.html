@@ -41,14 +41,33 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 .nav-tabs{display:flex;gap:2px;background:var(--bg3);border-radius:var(--r);padding:3px;border:1px solid var(--border);}
 .nav-tab{padding:6px 14px;font-size:13px;font-weight:500;background:transparent;color:var(--text2);border-radius:4px;cursor:pointer;transition:all .15s;}
 .nav-tab.active{background:var(--bg2);color:var(--text);border:1px solid var(--border2);}
-.health-bar{background:var(--bg2);border-bottom:1px solid var(--border);padding:.65rem 1.5rem;display:flex;align-items:center;gap:1.75rem;flex-wrap:wrap;}
+.health-bar{background:linear-gradient(180deg,var(--bg2) 0%,var(--bg3) 100%);border-bottom:1px solid var(--border);padding:.65rem 1.5rem;display:flex;align-items:center;gap:1.75rem;flex-wrap:wrap;}
 .health-item{display:flex;flex-direction:column;gap:2px;}
 .health-label{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;}
 .health-value{font-size:15px;font-weight:600;font-family:var(--mono);}
 .health-value.green{color:var(--green);}.health-value.amber{color:var(--amber);}.health-value.blue{color:var(--accent);}.health-value.red{color:var(--red);}
 .reminder-banner{margin-left:auto;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);color:var(--amber);border-radius:var(--r);padding:5px 12px;font-size:11px;font-family:var(--mono);display:flex;align-items:center;gap:7px;cursor:pointer;}
 .page{max-width:1400px;margin:0 auto;padding:1.5rem 2rem;display:none;}.page.active{display:block;}
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:1.2rem 1.4rem;margin-bottom:1rem;}
+.card{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:1.2rem 1.4rem;margin-bottom:1rem;}
+/* Spotlight très subtil qui suit la souris (effet 7, dosé discret) */
+.card.spotlight::before{content:'';position:absolute;inset:0;border-radius:inherit;opacity:0;transition:opacity .3s ease;background:radial-gradient(380px circle at var(--mx,50%) var(--my,50%),rgba(79,142,247,.06),transparent 60%);pointer-events:none;z-index:0;}
+.card.spotlight:hover::before{opacity:1;}
+.card.spotlight>*{position:relative;z-index:1;}
+/* Apparition en cascade des blocs du plan (effet 2) */
+@keyframes blockIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+.block-in{animation:blockIn .32s cubic-bezier(.22,1,.36,1) both;}
+/* Pulsation du bouton pendant le calcul (effet 3) */
+@keyframes calcPulse{0%,100%{box-shadow:0 0 0 0 rgba(79,142,247,.45);}50%{box-shadow:0 0 0 6px rgba(79,142,247,0);}}
+.btn-calc.calculating{animation:calcPulse 1.2s ease-in-out infinite;}
+/* Transition de page entre onglets (effet 8) */
+@keyframes pageIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.page.active{animation:pageIn .28s cubic-bezier(.22,1,.36,1);}
+@media(prefers-reduced-motion:reduce){
+  .etf-card:hover{transform:none;}
+  .block-in,.page.active{animation:none;}
+  .btn-calc.calculating{animation:none;}
+  .card.spotlight::before{display:none;}
+}
 .card-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.9rem;display:flex;align-items:center;gap:8px;}
 .card-title::before{content:'';width:3px;height:12px;background:var(--accent);border-radius:2px;}
 .onboarding{background:linear-gradient(135deg,var(--bg2),rgba(79,142,247,.04));border:1px solid rgba(79,142,247,.2);border-radius:var(--r2);padding:1.5rem;margin-bottom:1.25rem;}
@@ -57,7 +76,7 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 .onboarding-step.done{border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.04);}
 .step-num{width:26px;height:26px;border-radius:50%;background:var(--bg4);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--text3);flex-shrink:0;}
 .onboarding-step.done .step-num{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:var(--green);}
-.flow-layout{display:grid;grid-template-columns:320px 1fr 300px;gap:1.25rem;align-items:start;}
+.flow-layout{display:grid;grid-template-columns:330px 1fr 340px;gap:1.25rem;align-items:start;}
 @media(max-width:1150px){.flow-layout{grid-template-columns:1fr 1fr;}}
 @media(max-width:640px){.flow-layout{grid-template-columns:1fr;}}
 .flow-num{width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
@@ -85,6 +104,10 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 .price-chip.down{background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.2);}
 .pie-wrap{display:flex;flex-direction:column;align-items:center;gap:14px;}
 .pie-canvas-wrap{position:relative;width:160px;height:160px;flex-shrink:0;}
+/* Bloc Répartition fusionné : camembert + liste côte à côte (vertical sur mobile) */
+.alloc-layout{display:flex;flex-direction:column;gap:1rem;align-items:stretch;}
+.alloc-pie{flex-shrink:0;width:100%;display:flex;flex-direction:column;align-items:center;}
+.alloc-list{flex:1;min-width:0;}
 .portfolio-layout{display:grid;grid-template-columns:270px 1fr;gap:1.25rem;align-items:start;}
 .portfolio-left{position:sticky;top:70px;display:flex;flex-direction:column;gap:.75rem;}
 .form-group{display:flex;flex-direction:column;gap:5px;}
@@ -92,8 +115,8 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 .form-group input,.form-group select{width:100%;padding:7px 11px;height:34px;font-size:13px;}
 .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem;}
-.etf-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:1.1rem 1.3rem;transition:border-color .2s;}
-.etf-card:hover{border-color:var(--border2);}
+.etf-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:1.1rem 1.3rem;transition:border-color .2s,transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s ease;}
+.etf-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 6px 20px -8px rgba(0,0,0,.5);}
 .etf-card-header{display:flex;align-items:center;gap:8px;margin-bottom:.85rem;}
 .etf-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .etf-name-input{flex:1;font-size:13px;font-weight:500;font-family:var(--font);padding:5px 9px;height:32px;}
@@ -155,6 +178,25 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 .info-tip{overflow:hidden;max-height:0;opacity:0;transition:max-height .28s ease,opacity .22s ease,margin .28s ease;font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin:0;}
 .info-tip.open{max-height:200px;opacity:1;margin:6px 0 9px;}
 .info-row{display:flex;align-items:center;gap:6px;}
+/* Bloc repliable (titre cliquable + contenu animé) */
+.collapse-head{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;}
+.collapse-head .chev{margin-left:auto;color:var(--text3);font-size:12px;transition:transform .25s ease;flex-shrink:0;}
+.collapse-head.closed .chev{transform:rotate(-90deg);}
+.collapse-body{overflow:hidden;transition:max-height .3s ease,opacity .25s ease,margin .25s ease;}
+.collapse-body.closed{max-height:0!important;opacity:0;margin-top:0!important;pointer-events:none;}
+@media(prefers-reduced-motion:reduce){.collapse-body{transition:none;}.collapse-head .chev{transition:none;}}
+/* Label avec icône d'aide inline */
+.lbl-help{display:flex;align-items:center;gap:5px;}
+/* Sélecteur de jour du mois (grille compacte 1-28) */
+.day-picker{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:6px;overflow:hidden;animation:dayPickerIn .25s cubic-bezier(.22,1,.36,1);}
+@keyframes dayPickerIn{from{opacity:0;transform:translateY(-6px);max-height:0;}to{opacity:1;transform:translateY(0);max-height:300px;}}
+@keyframes dayPickerOut{from{opacity:1;transform:translateY(0);max-height:300px;}to{opacity:0;transform:translateY(-6px);max-height:0;}}
+@media(prefers-reduced-motion:reduce){.day-picker{animation:none;}}
+.day-trigger{display:flex;align-items:center;gap:6px;width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-size:13px;font-family:inherit;padding:7px 11px;cursor:pointer;text-align:left;transition:border-color .15s ease;}
+.day-trigger:hover{border-color:var(--border2);}
+.day-cell{font-size:11px;font-family:var(--mono);text-align:center;padding:5px 0;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text2);transition:all .15s ease;user-select:none;}
+.day-cell:hover{border-color:var(--border2);background:var(--bg3);}
+.day-cell.sel{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
 /* Modale de confirmation maison */
 .confirm-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);padding:1.3rem;width:380px;max-width:92vw;display:flex;flex-direction:column;gap:1.1rem;animation:confirmPop .22s cubic-bezier(.22,1,.36,1);}
 @keyframes confirmPop{from{opacity:0;transform:scale(.94) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
@@ -194,14 +236,16 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
   <div style="display:flex;align-items:center;gap:8px;">
     <span style="font-size:11px;font-family:var(--mono);color:var(--text3);" id="nav-date"></span>
     <button id="undo-btn" onclick="doUndo()" title="Annuler la dernière action (Ctrl+Z)" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text3);padding:5px 10px;font-size:13px;border-radius:var(--r);align-items:center;gap:5px;">&#8630; Annuler</button>
-    <button onclick="openSettings()" style="background:transparent;border:1px solid var(--border);color:var(--text3);padding:5px 10px;font-size:13px;border-radius:var(--r);">&#9881; Réglages</button>
+    <button id="redo-btn" onclick="doRedo()" title="Rétablir (Ctrl+Y)" style="display:none;background:transparent;border:1px solid var(--border);color:var(--text3);padding:5px 10px;font-size:13px;border-radius:var(--r);align-items:center;gap:5px;">&#8631; Rétablir</button>
+    <button onclick="openSettings()" style="background:transparent;border:1px solid var(--border);color:var(--text3);padding:5px 10px;font-size:13px;border-radius:var(--r);">&#9881; Paramètres</button>
   </div>
 </nav>
 <div class="health-bar">
   <div class="health-item"><div class="health-label">Valeur totale</div><div class="health-value blue" id="hb-total">— €</div></div>
-  <div class="health-item"><div class="health-label">Plus-value</div><div class="health-value green" id="hb-pv">— €</div></div>
+  <div class="health-item"><div class="health-label">En réserve</div><div class="health-value" id="hb-pv">— €</div></div>
   <div class="health-item"><div class="health-label">Écart max cible</div><div class="health-value" id="hb-drift">—</div></div>
   <div class="health-item"><div class="health-label">Épargne mensuelle</div><div class="health-value" id="hb-monthly">— €</div></div>
+  <div class="health-item"><div class="health-label">Fréquence</div><div class="health-value" id="hb-freq">—</div></div>
   <div id="reminder-wrap" style="margin-left:auto;"></div>
 </div>
 <!-- CE MOIS-CI -->
@@ -214,7 +258,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
       <div class="step-num" id="ob-num1">1</div>
       <div style="flex:1;">
         <div style="font-size:13px;font-weight:600;">Ajouter tes ETF</div>
-        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;">Importe ton CSV Trade Republic, ou ajoute-les à la main dans "Mon portefeuille"</div>
+        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;">Importe le CSV de ton courtier, ou ajoute-les à la main dans "Mon portefeuille"</div>
       </div>
       <div style="font-size:12px;color:var(--accent);font-weight:500;" id="ob-action1">Importer →</div>
     </div>
@@ -245,7 +289,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
         </div>
         <div id="quick-update-list"></div>
         <button class="btn-save-parts" onclick="saveQuickUpdate()">&#10003; Enregistrer les parts</button>
-        <button class="btn-import-csv" onclick="openImportModal()">&#128229; Importer CSV Trade Republic</button>
+        <button class="btn-import-csv" onclick="openImportModal()">&#128229; Importer un CSV</button>
       </div>
     </div>
     <!-- COL 2 -->
@@ -269,7 +313,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
       <div class="confirm-card" id="confirm-card">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:.75rem;">
           <div class="flow-num" style="background:var(--green);">3</div>
-          <div><div style="font-size:13px;font-weight:600;">Confirmer les ordres</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);">Tu as passé ces ordres sur Trade Republic ?</div></div>
+          <div><div style="font-size:13px;font-weight:600;">Confirmer les ordres</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);">Tu as passé ces ordres chez ton courtier ?</div></div>
         </div>
         <div id="confirm-orders-list"></div>
         <button class="btn-confirm" onclick="confirmOrders()">&#10003; Oui, ordres exécutés</button>
@@ -278,15 +322,15 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     </div>
     <!-- COL 3 -->
     <div style="display:flex;flex-direction:column;gap:.75rem;">
-      <div class="card" style="margin-bottom:0;">
+      <div class="card spotlight" style="margin-bottom:0;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
           <div class="card-title" style="margin-bottom:0;">Répartition</div>
           <span style="font-size:10px;font-family:var(--mono);color:var(--text3);" id="refresh-label">—</span>
         </div>
-        <div id="alloc-overview"></div>
-      </div>
-      <div class="card" style="margin-bottom:0;">
-        <div class="pie-wrap"><div class="pie-canvas-wrap"><canvas id="pie-main"></canvas></div><div id="pie-info" style="width:100%;font-family:var(--mono);font-size:11px;"></div></div>
+        <div class="alloc-layout">
+          <div class="alloc-pie"><div class="pie-canvas-wrap"><canvas id="pie-main"></canvas></div><div id="pie-info" style="width:100%;font-family:var(--mono);font-size:11px;margin-top:8px;"></div></div>
+          <div class="alloc-list" id="alloc-overview"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -301,10 +345,25 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
           <div class="form-group"><label>Épargne mensuelle (€)</label><input type="number" id="monthly" value="500" min="1"/></div>
           <div class="form-grid-2">
             <div class="form-group"><label>Fréquence</label><select id="freq"><option value="monthly">Mensuelle</option><option value="weekly">Hebdo</option></select></div>
-            <div class="form-group"><label>Report max</label><input type="number" id="max-defer" value="3" min="1" max="12"/></div>
+            <div class="form-group"><label class="lbl-help">Frais par ordre (€) <span class="info-ic" onclick="toggleInfo(this)">i</span></label><div class="info-tip">Ce que ton courtier te facture pour passer un ordre d'achat ponctuel. Mets 0 si c'est gratuit chez toi. Folia s'en sert pour estimer le coût réel de tes achats.</div><input type="number" id="fee-per-order" value="1" min="0" step="0.01"/></div>
           </div>
-          <div class="form-group"><label>Rééquilibrage</label><select id="rebal-mode"><option value="asap">Aussi vite que possible</option><option value="months">En N mois</option></select></div>
-          <div class="form-group" id="rebal-months-wrap" style="display:none;"><label>Horizon (mois)</label><input type="number" id="rebal-months" value="12" min="1"/></div>
+          <div class="form-group">
+            <label class="lbl-help">Jour de rappel <span class="info-ic" onclick="toggleInfo(this)">i</span></label>
+            <div class="info-tip">Le jour du mois où Folia t'invite à passer tes ordres. Choisis par exemple le jour où tu reçois ton salaire.</div>
+            <button type="button" id="reminder-day-trigger" class="day-trigger" onclick="toggleDayPicker()">Le <strong id="reminder-day-label">1</strong> de chaque mois <span style="margin-left:auto;color:var(--text3);">▾</span></button>
+            <div id="reminder-day-picker" class="day-picker" style="display:none;"></div>
+            <input type="hidden" id="reminder-day" value="1"/>
+          </div>
+          <div class="form-group">
+            <label class="lbl-help">Seuil d'alerte d'écart (%) <span class="info-ic" onclick="toggleInfo(this)">i</span></label>
+            <div class="info-tip">Quand un de tes ETF s'éloigne de sa cible de plus que ce pourcentage, le tableau de bord passe en alerte (orange puis rouge). Plus le seuil est bas, plus Folia est sensible au moindre déséquilibre. 8 % est une valeur raisonnable.</div>
+            <input type="number" id="drift-alert" value="8" min="1" max="50"/>
+          </div>
+          <div class="info-row" style="margin-top:4px;">
+            <span style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.45;">Folia investit automatiquement au plus vite vers ta répartition cible, sans jamais la dépasser.</span>
+            <span class="info-ic" onclick="toggleInfo(this)">i</span>
+          </div>
+          <div class="info-tip">Chaque mois, le budget va en priorité vers les ETF les plus en retard sur leur cible. Si une part est trop chère pour le budget du moment, le montant est mis en réserve et investi dès qu'un achat devient possible — sans jamais acheter au-delà de ta cible, pour que ta répartition converge proprement.</div>
         </div>
       </div>
     </div>
@@ -315,13 +374,10 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
           <button class="btn-refresh" onclick="triggerRefresh(true)">&#10227; Actualiser</button>
         </div>
       </div>
-      <div class="search-wrap">
-        <span class="search-icon">&#128269;</span>
-        <input class="search-input" id="etf-search" placeholder="Rechercher par nom, ticker ou ISIN…" oninput="onEtfSearch(this.value)" autocomplete="off"/>
-        <div class="search-results" id="search-results"></div>
-      </div>
       <div class="etf-grid" id="etf-grid"></div>
-      <button class="btn-add" onclick="addEtfBlank()">+ Ajouter un ETF vide</button>
+      <div style="display:flex;gap:8px;margin-top:5px;flex-wrap:wrap;">
+        <button class="btn-add" style="flex:1;margin-top:0;" onclick="openEtfLibrary()">+ Ajouter un ETF</button>
+      </div>
       <div class="alloc-total" id="alloc-total"></div>
     </div>
   </div>
@@ -342,7 +398,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 </div>
 <!-- PROJECTION -->
 <div class="page" id="page-projection">
-  <div class="card">
+  <div class="card spotlight">
     <div class="card-title">Simulation DCA</div>
     <div class="proj-controls">
       <label>Durée</label><input type="range" id="proj-years" min="1" max="40" value="20" oninput="updateProj()"/><span class="proj-val" id="proj-years-val">20 ans</span>
@@ -374,24 +430,33 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <div class="metrics-row" id="proj-metrics"></div>
     <div class="chart-wrap"><canvas id="chart-proj"></canvas></div>
   </div>
-  <div class="card" id="proj-etf-card"></div>
+  <div class="card" id="proj-fiscal-card">
+    <div class="collapse-head" onclick="toggleCollapse('fiscal')"><div class="card-title" style="margin-bottom:0;">Fiscalité PEA à la sortie</div><span class="chev" id="chev-fiscal">▾</span></div>
+    <div class="collapse-body" id="body-fiscal" style="margin-top:.75rem;"></div>
+  </div>
+  <div class="card" id="proj-etf-card">
+    <div class="collapse-head closed" onclick="toggleCollapse('etf')"><div class="card-title" style="margin-bottom:0;">Projection par ETF</div><span class="chev" id="chev-etf">▾</span></div>
+    <div class="collapse-body closed" id="body-etf" style="margin-top:.75rem;"></div>
+  </div>
   <div class="card" id="proj-history-card">
-    <div class="info-row" style="margin-bottom:.4rem;">
+    <div class="collapse-head closed" onclick="toggleCollapse('history')">
       <div class="card-title" style="margin-bottom:0;">Performances historiques</div>
-      <span class="info-ic" onclick="toggleInfo(this)">i</span>
+      <span class="info-ic" onclick="event.stopPropagation();toggleInfo(this)">i</span>
+      <span class="chev" id="chev-history">▾</span>
     </div>
     <div class="info-tip">Rendement annualisé réel de chaque ETF sur tout son historique disponible (dividendes réinvestis). C'est purement indicatif et <strong>spéculatif</strong> : le passé ne préjuge pas du futur. Plus l'historique est long, plus le chiffre est représentatif.</div>
-    <div id="proj-history-content">
-      <button class="btn-ghost" style="width:100%;" onclick="loadHistoricalPerf()">Voir les performances historiques de mes ETF</button>
+    <div class="collapse-body closed" id="body-history" style="margin-top:.75rem;">
+      <div id="proj-history-content">
+        <button class="btn-ghost" style="width:100%;" onclick="loadHistoricalPerf()">Voir les performances historiques de mes ETF</button>
+      </div>
     </div>
   </div>
-  <div class="card" id="proj-fiscal-card"></div>
 </div>
 <!-- SETTINGS OVERLAY -->
 <div class="overlay" id="poscheck-overlay" style="display:none;" onclick="if(event.target===this)closePosCheck()">
   <div class="modal">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;"><div style="font-size:15px;font-weight:600;">Vérifie tes positions</div><button onclick="closePosCheck()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;">&#215;</button></div>
-    <p style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:2px;">Nouveau mois : confirme le nombre de parts réellement détenues (lis-les sur Trade Republic). Tes ordres programmés ont pu acheter un nombre de parts différent du plan à cause des arrondis.</p>
+    <p style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:2px;">Nouveau mois : confirme le nombre de parts réellement détenues (lis-les chez ton courtier). Tes ordres programmés ont pu acheter un nombre de parts différent du plan à cause des arrondis.</p>
     <div id="poscheck-list" style="display:flex;flex-direction:column;gap:8px;margin:12px 0;"></div>
     <div style="display:flex;gap:8px;">
       <button class="btn-ghost" style="flex:1;" onclick="closePosCheck()">Plus tard</button>
@@ -401,7 +466,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 </div>
 <div class="overlay" id="settings-overlay" style="display:none;" onclick="if(event.target===this)closeSettings()">
   <div class="modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;"><div style="font-size:15px;font-weight:600;">&#9881; Réglages</div><button onclick="closeSettings()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;">&#215;</button></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;"><div style="font-size:15px;font-weight:600;">&#9881; Paramètres</div><button onclick="closeSettings()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;">&#215;</button></div>
     <div>
       <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Prix des ETF</div>
       <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:.5rem;">Les prix sont récupérés <strong>automatiquement</strong> (cours de clôture, via Yahoo Finance) à partir de l'ISIN ou du ticker de chaque ETF. Rien à configurer.</div>
@@ -415,7 +480,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
       <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="document.getElementById('import-data-file').click()">&#11014; Importer une sauvegarde</button>
       <input type="file" id="import-data-file" accept="application/json,.json" style="display:none;" onchange="importData(this.files[0])"/>
       <div id="data-io-status" style="font-size:11px;font-family:var(--mono);min-height:14px;margin-bottom:8px;"></div>
-      <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="openImportModal();closeSettings()">&#128229; Importer CSV Trade Republic</button>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="openImportModal();closeSettings()">&#128229; Importer un CSV</button>
       <button onclick="resetAllData()" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--red);font-size:12px;padding:7px;border-radius:var(--r);width:100%;">&#9888; Réinitialiser toutes les données</button>
     </div>
   </div>
@@ -423,14 +488,14 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 <!-- IMPORT OVERLAY -->
 <div class="overlay" id="import-modal" style="display:none;" onclick="if(event.target===this)closeImportModal()">
   <div class="modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;"><div style="font-size:15px;font-weight:600;">&#128229; Import CSV Trade Republic</div><button onclick="closeImportModal()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;">&#215;</button></div>
-    <p style="font-size:12px;color:var(--text2);">Compte → Documents → Historique des transactions → Exporter</p>
+    <div style="display:flex;align-items:center;justify-content:space-between;"><div style="font-size:15px;font-weight:600;">&#128229; Import CSV</div><button onclick="closeImportModal()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;">&#215;</button></div>
+    <p style="font-size:12px;color:var(--text2);">Exporte l'historique de tes transactions depuis ton courtier (souvent dans la section Documents, Relevés ou Historique), puis dépose le fichier ici.</p>
     <label for="csv-file" class="import-zone-label" id="import-zone"><div style="font-size:28px;margin-bottom:.4rem;">&#128196;</div><div style="font-size:13px;color:var(--text2);">Glisse ton CSV ici ou clique pour sélectionner</div></label>
     <input type="file" id="csv-file" accept=".csv" style="display:none;"/>
     <div id="import-preview"></div>
   </div>
 </div>
-<footer>Folia · v1.21.0 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.32.1 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
@@ -461,27 +526,43 @@ document.addEventListener('DOMContentLoaded',function(){
 })();
 
 const COLORS=['#4f8ef7','#34d399','#f97316','#a78bfa','#2dd4bf','#fbbf24','#f87171','#ec4899'];
-const KNOWN_ETFS=[
-  {name:'Amundi S&P 500',ticker:'500.PA',isin:'LU1681048804'},
+// Bibliothèque de base : ETF PEA courants proposés par défaut. La bibliothèque
+// complète (voir buildEtfLibrary) ajoute aussi les ETF que l'utilisateur a déjà
+// utilisés ou supprimés, pour qu'il reste dans un environnement familier.
+const BASE_ETF_LIBRARY=[
   {name:'Amundi MSCI World',ticker:'CW8.PA',isin:'LU0996182563'},
-  {name:'iShares Russell 2000',ticker:'RS2K.PA',isin:'IE00B3VVMM84'},
-  {name:'Amundi MSCI Emerging Markets',ticker:'PAEEM.PA',isin:'LU1681045370'},
+  {name:'Amundi MSCI World (PEA)',ticker:'WPEA.PA',isin:'IE0002XZSHO1'},
+  {name:'Lyxor MSCI World',ticker:'EWLD.PA',isin:'FR0011869353'},
+  {name:'Amundi S&P 500',ticker:'500.PA',isin:'LU1681048804'},
   {name:'Amundi PEA S&P 500',ticker:'PE500.PA',isin:'FR0013412285'},
   {name:'BNP Paribas Easy S&P 500',ticker:'ESE.PA',isin:'FR0011550185'},
-  {name:'Lyxor MSCI World',ticker:'EWLD.PA',isin:'FR0011869353'},
   {name:'Amundi NASDAQ-100',ticker:'ANX.PA',isin:'LU1681038243'},
+  {name:'Amundi PEA Nasdaq-100',ticker:'PUST.PA',isin:'FR0011871110'},
+  {name:'Amundi MSCI Emerging Markets',ticker:'PAEEM.PA',isin:'LU1681045370'},
+  {name:'iShares Russell 2000',ticker:'RS2K.PA',isin:'IE00B3VVMM84'},
+  {name:'Amundi PEA MSCI Emerging Markets',ticker:'PAEEM.PA',isin:'LU1681045370'},
+  {name:'Amundi MSCI Europe',ticker:'CEU.PA',isin:'LU1681042609'},
+  {name:'Lyxor PEA Eurozone (Euro Stoxx 50)',ticker:'MSE.PA',isin:'FR0011869320'},
+  {name:'Amundi CAC 40',ticker:'C40.PA',isin:'FR0007052782'},
+  {name:'Amundi PEA Monde (MSCI World)',ticker:'CW8.PA',isin:'FR001400U5Q4'},
+  {name:'Amundi MSCI India',ticker:'INR.PA',isin:'LU1681045370'},
+  {name:'BNP Paribas Easy Stoxx Europe 600',ticker:'ETZ.PA',isin:'FR0011550193'},
+  {name:'Amundi Euro Stoxx 50',ticker:'C50.PA',isin:'FR0007054358'},
 ];
 const INDEX_KEYWORDS=['MSCI World','S&P 500','Russell 2000','Emerging Market','NASDAQ','CAC 40','DAX','Euro Stoxx'];
-
 function load(){try{const d=localStorage.getItem('folia_v3');return d?JSON.parse(d):null;}catch(e){return null;}}
 
 const DEFAULT_STATE={
   etfs:[],
   monthly:500,freq:'monthly',maxDefer:3,expectedReturn:8,
+  feePerOrder:1,        // frais par ordre ponctuel (€) — dépend du courtier
+  reminderDay:1,        // jour du mois pour le rappel de versement
+  driftAlert:8,         // seuil d'écart à la cible (%) qui passe le bandeau en alerte
   history:[],deferredCash:0,nextId:0,rebalMode:'asap',rebalMonths:12,
   twelveDataKey:'',uiMode:'simple',lastCalcDate:null,pendingOrders:null,
   subChoices:{}, // {etfId: subIndex} — quel émetteur acheter pour chaque ETF groupe
-  _deferCounters:{} // {etfId: nb de mois consécutifs où l'ETF a été reporté}
+  _deferCounters:{}, // {etfId: nb de mois consécutifs où l'ETF a été reporté}
+  _archivedEtfs:[] // ETF supprimés, conservés pour récupération via la bibliothèque
 };
 
 let state=load()||JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -505,15 +586,18 @@ function save(){try{state.uiMode=uiMode;localStorage.setItem('folia_v3',JSON.str
   save();
 })();
 
-// ── Système d'annulation (Ctrl+Z) ──
-// On garde une pile des états précédents. pushUndo() capture l'état AVANT une action.
+// ── Système d'annulation / rétablissement (Ctrl+Z / Ctrl+Y) ──
+// _undoStack : états AVANT chaque action. _redoStack : états annulés, rejouables.
 const _undoStack=[];
+const _redoStack=[];
 const _UNDO_MAX=40;
 let _undoLabel='';
 function pushUndo(label){
   try{
     _undoStack.push({snap:JSON.stringify(state),label:label||'action'});
     if(_undoStack.length>_UNDO_MAX)_undoStack.shift();
+    // Une nouvelle action invalide tout rétablissement en attente (on a bifurqué).
+    _redoStack.length=0;
   }catch(e){}
   refreshUndoBtn();
 }
@@ -521,16 +605,34 @@ function doUndo(){
   if(!_undoStack.length){toast('Rien à annuler');return;}
   const entry=_undoStack.pop();
   try{
+    // Sauvegarder l'état ACTUEL dans la pile redo avant de restaurer
+    _redoStack.push({snap:JSON.stringify(state),label:entry.label});
     const restored=JSON.parse(entry.snap);
     Object.keys(state).forEach(k=>delete state[k]);
     Object.assign(state,restored);
     uiMode=state.uiMode||'simple';
     save();
-    // Re-render complet de toutes les vues
     renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();
     const pp=document.getElementById('page-projection');if(pp&&pp.classList.contains('active'))updateProj();
     toast('Annulé : '+entry.label);
   }catch(e){toast('Échec de l\'annulation');}
+  refreshUndoBtn();
+}
+function doRedo(){
+  if(!_redoStack.length){toast('Rien à rétablir');return;}
+  const entry=_redoStack.pop();
+  try{
+    // Sauvegarder l'état actuel dans la pile undo avant de rejouer
+    _undoStack.push({snap:JSON.stringify(state),label:entry.label});
+    const restored=JSON.parse(entry.snap);
+    Object.keys(state).forEach(k=>delete state[k]);
+    Object.assign(state,restored);
+    uiMode=state.uiMode||'simple';
+    save();
+    renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();
+    const pp=document.getElementById('page-projection');if(pp&&pp.classList.contains('active'))updateProj();
+    toast('Rétabli : '+entry.label);
+  }catch(e){toast('Échec du rétablissement');}
   refreshUndoBtn();
 }
 // Affiche le bouton « Annuler » seulement s'il y a quelque chose à annuler,
@@ -546,13 +648,53 @@ function refreshUndoBtn(){
       btn.style.display='none';
     }
   }
+  const rbtn=document.getElementById('redo-btn');
+  if(rbtn){
+    if(_redoStack.length){
+      rbtn.style.display='inline-flex';
+      const last=_redoStack[_redoStack.length-1];
+      rbtn.title='Rétablir : '+last.label+' (Ctrl+Y)';
+    }else{
+      rbtn.style.display='none';
+    }
+  }
   // Le bouton contextuel "Annuler la validation" ne reste visible qu'immédiatement
   // après une validation. Toute autre action (qui passe par pushUndo) ou une annulation
   // le masque, pour qu'il n'annule jamais autre chose que la validation qu'il désigne.
   const uvb=document.getElementById('undo-validation-btn');if(uvb)uvb.style.display='none';
 }
-window.doUndo=doUndo;
+window.doUndo=doUndo;window.doRedo=doRedo;
 // Petit message éphémère en bas d'écran
+// Spotlight (effet 7) : suit la souris sur les cartes marquées .spotlight.
+// Met à jour les variables CSS --mx/--my utilisées par le dégradé radial.
+document.addEventListener('mousemove',e=>{
+  const card=e.target.closest&&e.target.closest('.card.spotlight');
+  if(!card)return;
+  const r=card.getBoundingClientRect();
+  card.style.setProperty('--mx',(e.clientX-r.left)+'px');
+  card.style.setProperty('--my',(e.clientY-r.top)+'px');
+},{passive:true});
+
+// Count-up (effet 4) : anime un élément de sa valeur courante vers une valeur cible.
+// suffix ex. ' €'. Respecte prefers-reduced-motion (saut direct).
+const _reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+function countUp(el,to,suffix){
+  if(!el)return;suffix=suffix||'';
+  const fmt=v=>Math.round(v).toLocaleString('fr-FR')+suffix;
+  if(_reduceMotion){el.textContent=fmt(to);return;}
+  const from=el._cuVal||0;
+  if(from===to){el.textContent=fmt(to);return;}
+  const dur=600,t0=performance.now();
+  if(el._cuRAF)cancelAnimationFrame(el._cuRAF);
+  const step=now=>{
+    const p=Math.min(1,(now-t0)/dur);
+    const eased=1-Math.pow(1-p,3); // ease-out cubic
+    el.textContent=fmt(from+(to-from)*eased);
+    if(p<1)el._cuRAF=requestAnimationFrame(step);else{el._cuVal=to;el.textContent=fmt(to);}
+  };
+  el._cuVal=to;el._cuRAF=requestAnimationFrame(step);
+}
+
 let _toastTimer=null;
 function toast(msg){
   let el=document.getElementById('toast');
@@ -594,22 +736,60 @@ function toggleInfo(ic){
   ic.classList.toggle('open',open);
 }
 window.toggleInfo=toggleInfo;
+// Replie/déplie un bloc (Projection par ETF, Performances, Fiscalité).
+// L'état ouvert/fermé est mémorisé dans le state pour rester comme l'utilisateur l'a laissé.
+function toggleCollapse(key){
+  const head=document.querySelector('.collapse-head[onclick*="\''+key+'\'"]');
+  const body=document.getElementById('body-'+key);
+  if(!head||!body)return;
+  const willClose=!body.classList.contains('closed');
+  body.classList.toggle('closed',willClose);
+  head.classList.toggle('closed',willClose);
+  if(!willClose){
+    // À l'ouverture, fixer max-height à la hauteur réelle du contenu pour l'animation
+    body.style.maxHeight=body.scrollHeight+'px';
+  }
+  if(!state._collapsed)state._collapsed={};
+  state._collapsed[key]=willClose;save();
+}
+window.toggleCollapse=toggleCollapse;
+// Applique l'état replié mémorisé aux blocs (appelé après chaque updateProj)
+function applyCollapseState(){
+  const def={fiscal:false,etf:true,history:true}; // défauts : fiscal ouvert, autres fermés
+  ['fiscal','etf','history'].forEach(key=>{
+    const head=document.querySelector('.collapse-head[onclick*="\''+key+'\'"]');
+    const body=document.getElementById('body-'+key);
+    if(!head||!body)return;
+    const closed=state._collapsed&&state._collapsed[key]!=null?state._collapsed[key]:def[key];
+    body.classList.toggle('closed',closed);
+    head.classList.toggle('closed',closed);
+    if(!closed)body.style.maxHeight=body.scrollHeight+'px';
+  });
+}
+window.applyCollapseState=applyCollapseState;
 // Raccourci clavier Ctrl+Z (et Cmd+Z sur Mac)
 document.addEventListener('keydown',e=>{
-  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!e.shiftKey){
-    // Ne pas interférer si l'utilisateur édite activement un champ texte
-    const t=document.activeElement;
-    const inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);
-    if(inField)return; // laisser l'annulation native du champ
-    e.preventDefault();
-    doUndo();
+  const t=document.activeElement;
+  const inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);
+  if(inField)return; // laisser le comportement natif des champs (annulation de saisie)
+  const mod=e.ctrlKey||e.metaKey;
+  if(!mod)return;
+  const k=e.key.toLowerCase();
+  // Rétablir : Ctrl+Y  OU  Ctrl+Shift+Z (standard Mac)
+  if(k==='y'||(k==='z'&&e.shiftKey)){
+    e.preventDefault();doRedo();return;
+  }
+  // Annuler : Ctrl+Z (sans Shift)
+  if(k==='z'&&!e.shiftKey){
+    e.preventDefault();doUndo();return;
   }
 });
 document.getElementById('nav-date').textContent=new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
 function nav(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-  const p=document.getElementById('page-'+id);if(p)p.classList.add('active');
+  const p=document.getElementById('page-'+id);
+  if(p){void p.offsetWidth;p.classList.add('active');} // reflow → rejoue l'animation pageIn
   document.querySelectorAll('.nav-tab').forEach(t=>{if(t.getAttribute('onclick')==="nav('"+id+"')")t.classList.add('active');});
   if(id==='monthly')renderMonthly();
   if(id==='portfolio')renderEtfGrid();
@@ -621,18 +801,33 @@ function etfPrice(e){if(e.subs&&e.subs.length>0){const t=e.subs.reduce((s,s2)=>s
 function etfMonthPrice(e){if(e.subs&&e.subs.length>0){const t=e.subs.reduce((s,s2)=>s+(s2.shares||0),0);if(!t)return 0;return e.subs.reduce((s,s2)=>s+(s2.shares||0)*(s2._monthPrice||s2.avgPrice||0),0)/t;}return e._monthPrice||e._prevPrice||0;}
 function updateHealthBar(){
   const tv=state.etfs.reduce((s,e)=>s+etfValue(e),0);
-  const ti=state.history.filter(h=>h.confirmed).reduce((s,h)=>s+h.totalSpent,0);
-  const pv=tv-ti;
+  // Folia ne calcule PAS de plus-value (ça reste le rôle de ton courtier, qui
+  // connaît tes vrais coûts de revient). On affiche le cash en réserve, que Folia
+  // maîtrise exactement — c'est utile pour la planification.
+  const reserve=state.deferredCash||0;
   const drifts=state.etfs.map(e=>{const p=tv>0?(etfValue(e)/tv*100):0;return Math.abs(p-e.target);});
   const md=drifts.length?Math.max(...drifts):0;
-  document.getElementById('hb-total').textContent=tv.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €';
-  const pe=document.getElementById('hb-pv');pe.textContent=(pv>=0?'+':'')+pv.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €';pe.className='health-value '+(pv>=0?'green':'red');
-  const de=document.getElementById('hb-drift');de.textContent=md.toFixed(1)+'%';de.className='health-value '+(md<3?'green':md<8?'amber':'red');
+  document.getElementById('hb-total')&&countUp(document.getElementById('hb-total'),tv,' €');
+  const pe=document.getElementById('hb-pv');pe.textContent=reserve.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €';pe.className='health-value'+(reserve>0?' amber':'');
+  const da=state.driftAlert||8;
+  const de=document.getElementById('hb-drift');de.textContent=md.toFixed(1)+'%';de.className='health-value '+(md<da*0.4?'green':md<da?'amber':'red');
   document.getElementById('hb-monthly').textContent=state.monthly.toLocaleString('fr-FR')+' €';
+  document.getElementById('hb-freq').textContent=state.freq==='weekly'?'Hebdomadaire':'Mensuelle';
   const w=document.getElementById('reminder-wrap');
   const last=state.lastCalcDate?new Date(state.lastCalcDate):null;
-  const days=last?Math.floor((Date.now()-last)/86400000):999;
-  w.innerHTML=days>=28?'<div class="reminder-banner" onclick="calculate()">'+(last?days+' jours sans calcul':'Premier calcul')+' — Calculer →</div>':'';
+  const now=new Date();
+  const reminderDay=Math.min(28,Math.max(1,state.reminderDay||1));
+  // Calculé ce mois-ci ?
+  const calcedThisMonth=last&&last.getFullYear()===now.getFullYear()&&last.getMonth()===now.getMonth();
+  // Rappel si : on a atteint/dépassé le jour de rappel ce mois-ci et pas encore calculé ce mois.
+  const dueThisMonth=now.getDate()>=reminderDay&&!calcedThisMonth;
+  if(dueThisMonth){
+    w.innerHTML='<div class="reminder-banner" onclick="calculate()">'+(last?'C\'est le moment d\'investir':'Premier calcul')+' — Calculer →</div>';
+  }else if(!last){
+    w.innerHTML='<div class="reminder-banner" onclick="calculate()">Premier calcul — Calculer →</div>';
+  }else{
+    w.innerHTML='';
+  }
 }
 function updateOnboarding(){
   // Nouvel ordre : 1) ajouter ETF  2) allocations + épargne  3) calculer
@@ -709,13 +904,18 @@ function renderQuickUpdate(){
     const etfHasParts=hasSubs?e.subs.some(s=>s.shares>0):e.shares>0;
     if(!hasSubs){
       const val=etfValue(e);
-      html+='<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);">'
-        +'<span style="width:7px;height:7px;border-radius:50%;background:'+color+';flex-shrink:0;display:inline-block;"></span>'
-        +'<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e.name+'</div>'+(e.isin?'<div>'+isinLink(e.isin)+'</div>':'')+'</div>'
-        +'<span id="qu-val-'+eid+'" style="font-size:10px;font-family:var(--mono);color:var(--text3);white-space:nowrap;transition:color .15s;">'+(val>0?val.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €':'')+'</span>'
-        +(etfHasParts?'<span style="font-size:10px;color:var(--green);">✓</span>':'')
-        +'<input type="number" data-eid="'+eid+'" data-field="shares" value="'+e.shares+'" min="0" step="0.001" class="qu-input" style="width:80px;text-align:right;padding:4px 7px;height:27px;font-size:12px;flex-shrink:0;"/>'
-        +'<button data-remove-idx="'+i+'" style="background:transparent;border:none;color:var(--text3);font-size:16px;padding:0 2px;cursor:pointer;line-height:1;">×</button>'
+      html+='<div style="padding:8px 0;border-bottom:1px solid var(--border);">'
+        +'<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px;">'
+        +'<span style="width:8px;height:8px;border-radius:50%;background:'+color+';flex-shrink:0;display:inline-block;"></span>'
+        +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+e.name+'</div>'+(e.isin?'<div>'+isinLink(e.isin)+'</div>':'')+'</div>'
+        +(etfHasParts?'<span style="font-size:11px;color:var(--green);flex-shrink:0;">✓</span>':'')
+        +'<button data-remove-idx="'+i+'" style="background:transparent;border:none;color:var(--text3);font-size:17px;padding:0 2px;cursor:pointer;line-height:1;flex-shrink:0;">×</button>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;">'
+        +'<label style="font-size:11px;color:var(--text3);font-family:var(--mono);flex:1;">Parts détenues</label>'
+        +'<span id="qu-val-'+eid+'" style="font-size:11px;font-family:var(--mono);color:var(--text3);white-space:nowrap;transition:color .15s;">'+(val>0?val.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €':'')+'</span>'
+        +'<input type="number" data-eid="'+eid+'" data-field="shares" value="'+e.shares+'" min="0" step="0.001" class="qu-input" style="width:88px;text-align:right;padding:5px 8px;height:30px;font-size:13px;flex-shrink:0;"/>'
+        +'</div>'
         +'</div>';
     } else {
       const tv=etfValue(e);
@@ -795,7 +995,7 @@ function renderAllocOverview(){
     const color=COLORS[i%COLORS.length];const chip=renderDeltaChip(e);
     const hasSubs=e.subs&&e.subs.length>0;
     const subInfo=hasSubs?'<div style="margin-top:2px;">'+e.subs.map(s=>'<div style="display:flex;align-items:center;gap:4px;"><span style="font-size:10px;color:var(--text3);">↳</span><span style="font-size:11px;color:var(--text2);">'+(s.name||s.isin||'—')+'</span>'+(s.isin?' '+isinLink(s.isin):'')+'</div>').join('')+'</div>':'';
-    return '<div class="alloc-item">'
+    return '<div class="alloc-item" data-alloc-idx="'+i+'">'
       +'<span class="alloc-dot" style="background:'+color+'"></span>'
       +'<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:500;">'+e.name+'</div>'+(!hasSubs&&e.isin?'<div>'+isinLink(e.isin)+'</div>':'')+subInfo+'</div>'
       +'<div style="flex-shrink:0;text-align:right;">'
@@ -833,40 +1033,115 @@ function renderPieChart(){
   const total=state.etfs.reduce((s,e)=>s+etfValue(e),0);
   const data=state.etfs.map(e=>total>0?(etfValue(e)/total*100):e.target);
   const colors=state.etfs.map((_,i)=>COLORS[i%COLORS.length]);
-  function defInfo(){infoEl.innerHTML=state.etfs.map((e,i)=>'<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border);"><span style="width:7px;height:7px;border-radius:50%;background:'+colors[i]+';display:inline-block;"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">'+e.name+'</span><span style="font-weight:600;font-size:11px;">'+data[i].toFixed(1)+'%</span></div>').join('');}
+  // Synthèse affichée sous le camembert (pas de doublon avec la liste à côté) :
+  // nombre de lignes + plus gros écart à la cible.
+  function defInfo(){
+    if(!state.etfs.length){infoEl.innerHTML='';return;}
+    const drifts=state.etfs.map((e,i)=>({name:e.name,d:data[i]-e.target}));
+    const worst=drifts.reduce((a,b)=>Math.abs(b.d)>Math.abs(a.d)?b:a,drifts[0]);
+    const aligned=Math.abs(worst.d)<1;
+    infoEl.innerHTML='<div style="text-align:center;color:var(--text3);line-height:1.5;">'
+      +state.etfs.length+' ETF · '
+      +(aligned
+        ?'<span style="color:var(--green);">aligné sur ta cible</span>'
+        :'écart max <span style="color:'+(Math.abs(worst.d)<8?'var(--amber)':'var(--red)')+';">'+(worst.d>=0?'+':'')+worst.d.toFixed(1)+'%</span>')
+      +'</div>';
+  }
+  // Surligne la ligne correspondante dans la liste (liaison visuelle, sans répéter les chiffres)
+  function highlightRow(idx){
+    document.querySelectorAll('.alloc-item').forEach(el=>{
+      const on=+el.getAttribute('data-alloc-idx')===idx;
+      el.style.background=on?'var(--bg3)':'';
+      el.style.borderRadius=on?'var(--r)':'';
+    });
+  }
   if(pieChart)pieChart.destroy();
   pieChart=new Chart(ctx,{type:'doughnut',
     data:{labels:state.etfs.map(e=>e.name),datasets:[{data,backgroundColor:colors.map(c=>c+'99'),borderColor:colors,borderWidth:1.5,hoverBackgroundColor:colors,hoverOffset:5}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}},cutout:'62%',
       onHover:(evt,els)=>{
-        if(els.length>0){
-          const idx=els[0].index;const e=state.etfs[idx];const pct=data[idx];const d=pct-e.target;
-          const dc=Math.abs(d)<1?'var(--green)':d>0?'var(--amber)':'var(--accent)';
-          infoEl.innerHTML='<div><div style="font-size:12px;font-weight:600;margin-bottom:7px;display:flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:'+colors[idx]+';display:inline-block;"></span>'+e.name+'</div>'
-            +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">'
-            +'<div style="background:var(--bg3);padding:6px 8px;border-radius:var(--r);border:1px solid var(--border);"><div style="font-size:9px;color:var(--text3);">ACTUEL</div><div style="font-size:15px;font-weight:600;color:'+colors[idx]+';">'+pct.toFixed(1)+'%</div></div>'
-            +'<div style="background:var(--bg3);padding:6px 8px;border-radius:var(--r);border:1px solid var(--border);"><div style="font-size:9px;color:var(--text3);">CIBLE</div><div style="font-size:15px;font-weight:600;color:var(--text2);">'+e.target+'%</div></div>'
-            +'</div>'
-            +'<div style="margin-top:5px;background:var(--bg3);padding:5px 8px;border-radius:var(--r);border:1px solid var(--border);display:flex;justify-content:space-between;">'
-            +'<span style="font-size:9px;color:var(--text3);">ÉCART</span><span style="font-size:12px;font-weight:600;color:'+dc+';">'+(d>=0?'+':'')+d.toFixed(1)+'%</span></div>'
-            +(etfValue(e)>0?'<div style="margin-top:4px;font-size:10px;color:var(--text3);">'+etfValue(e).toLocaleString('fr-FR',{maximumFractionDigits:0})+' €</div>':'')
-            +'</div>';
-        }else defInfo();
+        if(els.length>0){highlightRow(els[0].index);}
+        else{highlightRow(-1);}
       }
     }
   });
   defInfo();
 }
-function onEtfSearch(val){
-  const q=val.trim().toLowerCase();const res=document.getElementById('search-results');
-  if(!q){res.classList.remove('open');return;}
-  const matches=KNOWN_ETFS.filter(e=>e.name.toLowerCase().includes(q)||e.ticker.toLowerCase().includes(q)||e.isin.toLowerCase().includes(q)).slice(0,6);
-  if(!matches.length){res.classList.remove('open');return;}
-  res.innerHTML=matches.map((e,i)=>'<div class="search-result-item" onclick="addEtfFromSearch('+i+')">'+'<div><div style="font-size:13px;font-weight:500;">'+e.name+'</div><div style="font-size:11px;font-family:var(--mono);color:var(--text3);">'+e.ticker+' · '+e.isin+'</div></div>'+'<span class="badge badge-blue" style="font-size:10px;">+ Ajouter</span></div>').join('');
-  res._matches=matches;res.classList.add('open');
+// ── Bibliothèque d'ETF ───────────────────────────────────────────
+// Construit la liste proposée à l'ajout : base PEA courante + ETF déjà connus
+// de l'utilisateur (actuels et archivés/supprimés), dédupliqués par ISIN/ticker.
+function buildEtfLibrary(){
+  const seen=new Set();const lib=[];
+  const key=e=>((e.isin||'')+'|'+(e.ticker||'')).toUpperCase();
+  const add=(e,src)=>{
+    if(!e||(!e.isin&&!e.ticker&&!e.name))return;
+    const k=key(e);if(seen.has(k))return;seen.add(k);
+    lib.push({name:e.name||e.isin||e.ticker,ticker:e.ticker||'',isin:e.isin||'',src});
+  };
+  // 1) ETF actuellement dans le portefeuille (déjà ajoutés) → marqués pour info
+  (state.etfs||[]).forEach(e=>{
+    if(e.subs&&e.subs.length)e.subs.forEach(s=>add(s,'actuel'));
+    else add(e,'actuel');
+  });
+  // 2) ETF archivés (supprimés auparavant) → récupérables
+  (state._archivedEtfs||[]).forEach(e=>add(e,'archive'));
+  // 3) Base PEA courante
+  BASE_ETF_LIBRARY.forEach(e=>add(e,'base'));
+  return lib;
 }
-function addEtfFromSearch(idx){const res=document.getElementById('search-results');const e=res._matches[idx];if(!e)return;state.etfs.push({id:state.nextId++,name:e.name,ticker:e.ticker,isin:e.isin,target:0,shares:0,avgPrice:0,_nameLocked:true});save();document.getElementById('etf-search').value='';res.classList.remove('open');renderEtfGrid();}
-document.addEventListener('click',e=>{const res=document.getElementById('search-results');if(!document.getElementById('etf-search')?.contains(e.target))res.classList.remove('open');});
+// Ouvre la fenêtre bibliothèque pour choisir/récupérer un ETF, ou en saisir un nouveau.
+function openEtfLibrary(){
+  const lib=buildEtfLibrary();
+  const ov=document.createElement('div');ov.className='overlay';ov.style.zIndex='9999';
+  const box=document.createElement('div');box.className='confirm-box';box.style.width='460px';box.style.maxHeight='80vh';box.style.gap='.8rem';
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey);};
+  const onKey=e=>{if(e.key==='Escape')close();};
+  document.addEventListener('keydown',onKey);
+  ov.onclick=e=>{if(e.target===ov)close();};
+
+  let html='<div style="font-size:15px;font-weight:600;">Ajouter un ETF</div>'
+    +'<div style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.45;">Choisis un ETF de ta bibliothèque, récupère-en un que tu avais retiré, ou saisis-en un nouveau. Tu renseigneras tes parts ensuite.</div>'
+    +'<input id="lib-filter" placeholder="Filtrer par nom, ticker ou ISIN…" autocomplete="off" style="width:100%;padding:8px 11px;height:34px;font-size:13px;"/>'
+    +'<div id="lib-list" style="overflow-y:auto;max-height:320px;display:flex;flex-direction:column;gap:5px;"></div>'
+    +'<div style="border-top:1px solid var(--border);padding-top:.8rem;">'
+    +'<button class="btn-add" style="margin-top:0;width:100%;" id="lib-blank">+ Saisir un nouvel ETF (vide)</button></div>';
+  box.innerHTML=html;ov.append(box);document.body.append(ov);
+
+  const listEl=box.querySelector('#lib-list');
+  const render=filter=>{
+    const q=(filter||'').trim().toLowerCase();
+    const items=lib.filter(e=>!q||e.name.toLowerCase().includes(q)||(e.ticker||'').toLowerCase().includes(q)||(e.isin||'').toLowerCase().includes(q));
+    if(!items.length){listEl.innerHTML='<div style="font-size:12px;color:var(--text3);font-family:var(--mono);padding:8px;">Aucun ETF dans la bibliothèque pour « '+filter+' ». Utilise « Saisir un nouvel ETF ».</div>';return;}
+    listEl.innerHTML=items.map((e,i)=>{
+      const tag=e.src==='actuel'?'<span style="font-size:9px;color:var(--text3);border:1px solid var(--border);padding:1px 5px;border-radius:8px;">déjà ajouté</span>'
+        :e.src==='archive'?'<span style="font-size:9px;color:var(--accent);border:1px solid rgba(79,142,247,.3);padding:1px 5px;border-radius:8px;">retiré</span>':'';
+      return '<div class="search-result-item" data-i="'+lib.indexOf(e)+'" style="border:1px solid var(--border);border-radius:var(--r);">'
+        +'<div><div style="font-size:13px;font-weight:500;">'+e.name+'</div>'
+        +'<div style="font-size:11px;font-family:var(--mono);color:var(--text3);">'+(e.ticker||'—')+' · '+(e.isin||'—')+'</div></div>'
+        +'<div style="display:flex;align-items:center;gap:6px;">'+tag+'<span class="badge badge-blue" style="font-size:10px;">+ Ajouter</span></div></div>';
+    }).join('');
+    listEl.querySelectorAll('.search-result-item').forEach(el=>{
+      el.onclick=()=>{const e=lib[+el.getAttribute('data-i')];addEtfFromLibrary(e);close();};
+    });
+  };
+  render('');
+  box.querySelector('#lib-filter').addEventListener('input',e=>render(e.target.value));
+  box.querySelector('#lib-blank').onclick=()=>{close();addEtfBlank();};
+  box.querySelector('#lib-filter').focus();
+}
+// Ajoute un ETF choisi dans la bibliothèque (toujours à 0 part — l'utilisateur saisit ensuite)
+function addEtfFromLibrary(e){
+  if(!e)return;
+  // Éviter le doublon si déjà présent dans le portefeuille
+  const exists=state.etfs.some(x=>(x.isin&&e.isin&&x.isin===e.isin)||(x.ticker&&e.ticker&&x.ticker===e.ticker));
+  if(exists){toast('Cet ETF est déjà dans ton portefeuille');return;}
+  pushUndo('ajout d\'un ETF');
+  state.etfs.push({id:state.nextId++,name:e.name,ticker:e.ticker||'',isin:e.isin||'',target:0,shares:0,avgPrice:0,_nameLocked:!!e.name});
+  save();renderEtfGrid();
+  toast('« '+e.name+' » ajouté — renseigne tes parts et ta cible');
+}
+window.openEtfLibrary=openEtfLibrary;
+document.addEventListener('click',e=>{const res=document.getElementById('search-results');if(res&&!document.getElementById('etf-search')?.contains(e.target))res.classList.remove('open');});
 function addSubEtf(eid){
   const etf=state.etfs.find(e=>e.id===eid);if(!etf)return;
   if(!etf.subs){
@@ -955,8 +1230,22 @@ window.removeSubEtf=removeSubEtf;
 window.setSubField=setSubField;
 window.resolveSubEtf=resolveSubEtf;
 function addEtfBlank(){pushUndo('ajout d\'un ETF');state.etfs.push({id:state.nextId++,name:'',ticker:'',isin:'',target:0,shares:0,avgPrice:0});save();renderEtfGrid();}
-function removeEtf(i){pushUndo('suppression de « '+(state.etfs[i]?.name||'ETF')+' »');state.etfs.splice(i,1);save();renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();}
-async function removeEtfFromHome(i){if(!await confirmModal('Supprimer "'+state.etfs[i].name+'" ?',{okText:'Supprimer',danger:true}))return;pushUndo('suppression de « '+(state.etfs[i]?.name||'ETF')+' »');state.etfs.splice(i,1);save();renderMonthly();renderEtfGrid();}
+// Archive l'identité d'un ETF supprimé dans la bibliothèque (récupérable ensuite).
+// Ne stocke que nom/ISIN/ticker (pas les parts) — l'utilisateur les ressaisira.
+function archiveEtf(etf){
+  if(!etf)return;
+  if(!state._archivedEtfs)state._archivedEtfs=[];
+  const stash=o=>{
+    if(!o||(!o.isin&&!o.ticker&&!o.name))return;
+    const k=((o.isin||'')+'|'+(o.ticker||'')).toUpperCase();
+    if(state._archivedEtfs.some(a=>((a.isin||'')+'|'+(a.ticker||'')).toUpperCase()===k))return;
+    state._archivedEtfs.unshift({name:o.name||o.isin||o.ticker,ticker:o.ticker||'',isin:o.isin||''});
+  };
+  if(etf.subs&&etf.subs.length)etf.subs.forEach(stash);else stash(etf);
+  if(state._archivedEtfs.length>50)state._archivedEtfs=state._archivedEtfs.slice(0,50);
+}
+function removeEtf(i){archiveEtf(state.etfs[i]);pushUndo('suppression de « '+(state.etfs[i]?.name||'ETF')+' »');state.etfs.splice(i,1);save();renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();}
+async function removeEtfFromHome(i){if(!await confirmModal('Supprimer "'+state.etfs[i].name+'" ?',{okText:'Supprimer',danger:true}))return;archiveEtf(state.etfs[i]);pushUndo('suppression de « '+(state.etfs[i]?.name||'ETF')+' »');state.etfs.splice(i,1);save();renderMonthly();renderEtfGrid();}
 function isISIN(v){return/^[A-Z]{2}[A-Z0-9]{10}$/.test((v||'').trim().toUpperCase());}
 function justEtfLink(etf){const isin=(etf.isin||'').trim().toUpperCase();if(isin&&isISIN(isin))return'https://www.justetf.com/en/etf-profile.html?isin='+isin;const t=(etf.ticker||'').trim();return t?'https://www.justetf.com/en/search.html?search=ETFS&query='+encodeURIComponent(t):'https://www.justetf.com/en/find-etf.html';}
 function onIdentInput(i,val){const v=val.trim().toUpperCase();if(isISIN(v)){state.etfs[i].isin=v;}else{state.etfs[i].ticker=v;state.etfs[i].isin='';}save();const a=document.getElementById('jef-'+i);if(a)a.href=justEtfLink(state.etfs[i]);}
@@ -1479,7 +1768,7 @@ async function calculate(){
   _posCheckDone=false; // réinitialiser pour le prochain mois
   syncSettingsFromInputs();
   if(!state.subChoices)state.subChoices={};
-  const btn=document.getElementById('btn-calc');btn.disabled=true;btn.textContent='Calcul…';
+  const btn=document.getElementById('btn-calc');btn.disabled=true;btn.textContent='Calcul…';btn.classList.add('calculating');
   setCalcStatus('live','Récupération des prix…');
   try{
   const pm=await fetchAllBatch();
@@ -1521,10 +1810,10 @@ async function calculate(){
   };
   const budget=state.monthly+(state.deferredCash||0);
   const curTotal=state.etfs.reduce((s,e)=>s+liveValue(e),0);
-  // Cible : où chaque ETF devrait être APRÈS avoir investi le budget de ce mois
-  const targetTotal=state.rebalMode==='months'&&state.rebalMonths>0
-    ?curTotal+state.monthly*state.rebalMonths
-    :curTotal+budget;
+  // Cible : où chaque ETF devrait être APRÈS avoir investi le budget de ce mois.
+  // Folia vise toujours la cible au plus vite (le cash en réserve s'investit dès
+  // qu'une part devient achetable sans dépasser la cible).
+  const targetTotal=curTotal+budget;
 
   const etfData=state.etfs.map(e=>({
     ...e,
@@ -1577,32 +1866,9 @@ async function calculate(){
     }
   }
 
-  // ── Report max : forcer l'achat des ETF reportés depuis trop longtemps ──
-  // UNIQUEMENT pour les reports liés au BUDGET (la part coûte plus que le budget,
-  // le cash s'accumule). On ne force JAMAIS un report d'ÉQUILIBRE : forcer l'achat
-  // d'un ETF déjà proche de sa cible irait contre le but premier (respecter la
-  // répartition). Le report max sert à débloquer le cash qui dort, pas à déséquilibrer.
-  const maxDefer=state.maxDefer||3;
-  etfData.forEach(e=>{
-    if(purchases[e.id]>0)return;            // déjà acheté ce mois
-    if(!e.price||e.price>remaining)return;  // pas les moyens, même en forçant
-    const underweight=e.currentValue<e.idealValue-0.5;
-    if(!underweight)return;                 // pas sous-pondéré → pas concerné
-    // Report d'équilibre : l'acheter dépasserait la cible → ne PAS forcer.
-    // (Si on a les moyens mais que l'algo n'a pas acheté, c'est un report d'équilibre.)
-    const wouldOvershoot=(e.currentValue+e.price)>e.idealValue+e.price/2;
-    if(wouldOvershoot)return;
-    const deferredMonths=(state._deferCounters&&state._deferCounters[e.id])||0;
-    if(deferredMonths+1>=maxDefer){          // +1 = ce mois-ci inclus
-      purchases[e.id]+=1;
-      remaining-=e.price;
-      e._forced=true; // marquer pour l'affichage
-    }
-  });
-
   const decisions=etfData.map(etf=>{
     const s=purchases[etf.id];
-    if(s>0)return{...etf,shares_to_buy:s,spent:s*etf.price,action:'buy',forced:!!etf._forced};
+    if(s>0)return{...etf,shares_to_buy:s,spent:s*etf.price,action:'buy'};
     if(!etf.price)return{...etf,shares_to_buy:0,spent:0,action:'noPrice'};
     // Pas acheté : soit déjà à/au-dessus de la cible, soit reporté
     const underweight=etf.currentValue<etf.idealValue-0.5;
@@ -1669,7 +1935,7 @@ async function calculate(){
     setCalcStatus('','Erreur : '+(err.message||err));
     console.error('calculate error:',err);
   }finally{
-    btn.disabled=false;btn.textContent='⟳ Calculer le plan';
+    btn.disabled=false;btn.textContent='⟳ Calculer le plan';btn.classList.remove('calculating');
   }
 }
 function renderPlanOrders(pending){
@@ -1686,12 +1952,19 @@ function renderPlanOrders(pending){
   let html='';
 
   // ── Résumé ───────────────────────────────────────────────────────
+  // Frais : un ordre ponctuel par ETF acheté ce mois (selon le courtier).
+  const feePer=state.feePerOrder!=null?state.feePerOrder:1;
+  const totalFees=feePer>0?buys.length*feePer:0;
   html+='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 13px;margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;">'
     +'<div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">À INVESTIR</div><div style="font-size:17px;font-weight:600;font-family:var(--mono);color:var(--green);">'+totalSpent.toFixed(2)+' €</div></div>'
     +'<div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">BUDGET</div><div style="font-size:17px;font-weight:600;font-family:var(--mono);">'+budget.toFixed(0)+' €</div></div>'
     +(remaining>0?'<div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">REPORTÉ</div><div style="font-size:17px;font-weight:600;font-family:var(--mono);color:var(--amber);">'+remaining.toFixed(2)+' €</div></div>':'')
     +'<div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">ORDRES</div><div style="font-size:17px;font-weight:600;font-family:var(--mono);">'+buys.length+'</div></div>'
+    +(totalFees>0?'<div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">FRAIS EST.</div><div style="font-size:17px;font-weight:600;font-family:var(--mono);color:var(--text2);">'+totalFees.toFixed(2)+' €</div></div>':'')
     +'</div>';
+  if(totalFees>0&&state.freq!=='weekly'){
+    html+='<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin:-6px 0 12px;line-height:1.4;">Coût total estimé : <strong>'+(totalSpent+totalFees).toFixed(2)+' €</strong> ('+buys.length+' ordre'+(buys.length>1?'s':'')+' × '+feePer.toFixed(2)+' € de frais). Les frais ne sont pas investis.</div>';
+  }
 
   // ── Ordres à passer (MODE MENSUEL uniquement) ────────────────────
   if(buys.length&&state.freq!=='weekly'){
@@ -1704,7 +1977,6 @@ function renderPlanOrders(pending){
         +'<div style="display:flex;align-items:center;gap:8px;">'
         +'<span style="width:9px;height:9px;border-radius:50%;background:'+color+';display:inline-block;flex-shrink:0;"></span>'
         +'<span style="font-size:13px;font-weight:600;">'+( d.displayName||d.name)+'</span>'
-        +(d.forced?'<span style="font-size:9px;font-family:var(--mono);color:var(--amber);background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);padding:1px 6px;border-radius:10px;">report max atteint</span>':'')
         +'</div>'
         +'<span style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--green);">'+d.spent.toFixed(2)+' €</span>'
         +'</div>'
@@ -1726,7 +1998,7 @@ function renderPlanOrders(pending){
       html+='<div style="margin:14px 0 6px;"><div class="info-row" style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;">'
         +'<span style="width:3px;height:11px;background:var(--accent);border-radius:2px;display:inline-block;"></span>À programmer chaque semaine'
         +'<span class="info-ic" onclick="toggleInfo(this)">i</span></div>'
-        +'<div class="info-tip">Ordres programmés Trade Republic (sans frais). Le montant achète le maximum de parts entières possible chaque semaine.</div></div>';
+        +'<div class="info-tip">Ordres programmés chez ton courtier. Le montant achète le maximum de parts entières possible chaque semaine.</div></div>';
       weekly.forEach(e=>{
         html+='<div style="background:rgba(79,142,247,.04);border:1px solid rgba(79,142,247,.15);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;">'
           +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">'
@@ -1753,7 +2025,7 @@ function renderPlanOrders(pending){
       html+='<div style="margin:16px 0 6px;"><div class="info-row" style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;">'
         +'<span style="width:3px;height:11px;background:var(--green);border-radius:2px;display:inline-block;"></span>À acheter en une fois ce mois-ci'
         +'<span class="info-ic" onclick="toggleInfo(this)">i</span></div>'
-        +'<div class="info-tip">Ces ETF sont trop chers pour un étalement hebdomadaire (moins d\'une part par semaine). Achète-les en un seul ordre ponctuel en début de mois. <strong>1 € de frais</strong> Trade Republic s\'applique sur cet ordre.</div></div>';
+        +'<div class="info-tip">Ces ETF sont trop chers pour un étalement hebdomadaire (moins d\'une part par semaine). Achète-les en un seul ordre ponctuel en début de mois. Des frais peuvent s\'appliquer sur cet ordre selon ton courtier.</div></div>';
       single.forEach(e=>{
         html+='<div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.18);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;">'
           +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">'
@@ -1763,7 +2035,7 @@ function renderPlanOrders(pending){
           +'<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:5px;">'
           +'<span style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--green);">'+e.shares+'</span>'
           +'<span style="font-size:12px;color:var(--text2);">part'+(e.shares>1?'s':'')+' en une fois</span>'
-          +'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:auto;">'+e.monthlyEur.toFixed(2)+' € + 1 € frais = '+e.totalCost.toFixed(2)+' €</span>'
+          +'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:auto;">'+e.monthlyEur.toFixed(2)+' €'+(e.fee>0?' + '+e.fee.toFixed(2)+' € frais':'')+' = '+e.totalCost.toFixed(2)+' €</span>'
           +'</div>'
           +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.4;border-top:1px solid var(--border);padding-top:6px;">'
           +'Prix unitaire '+e.price.toFixed(2)+' €'
@@ -1828,6 +2100,14 @@ function renderPlanOrders(pending){
   }
 
   el.innerHTML=html||'<div style="text-align:center;padding:1rem;font-size:12px;color:var(--text3);font-family:var(--mono);">Aucun ordre à passer ce mois-ci.</div>';
+  // Cascade d'apparition (effet 2) : les blocs directs s'animent en décalé.
+  if(!_reduceMotion){
+    const blocks=Array.from(el.children).filter(c=>c.nodeType===1);
+    blocks.forEach((b,i)=>{
+      b.classList.add('block-in');
+      b.style.animationDelay=Math.min(i*45,360)+'ms';
+    });
+  }
 }
 function renderConfirmList(pending){
   const el=document.getElementById('confirm-orders-list');const buys=pending.results.filter(d=>d.action==='buy');
@@ -1836,7 +2116,6 @@ function renderConfirmList(pending){
 // Plan hebdomadaire — PRÉSENTE les achats déjà décidés par calculate() (parts entières,
 // réserve, etc.). Ne recalcule JAMAIS les parts : il répartit ou regroupe l'affichage.
 // Un ETF n'apparaît que dans UNE seule section.
-const FEE_PER_ORDER=1; // frais Trade Republic sur un ordre ponctuel manuel (€)
 function buildWeeklyPlan(buys,weeks){
   const weekly=[],single=[];
   buys.forEach(d=>{
@@ -1852,9 +2131,10 @@ function buildWeeklyPlan(buys,weeks){
       single.length; // no-op lisibilité
       weekly.push({name,color,price,monthlyEur,weeklyEur,shares,approxShares:weeklyEur/price});
     } else {
-      // 1 à 3 parts sur le mois → achat ponctuel unique. 1 € de frais sur l'ordre.
-      const totalCost=monthlyEur+FEE_PER_ORDER;
-      single.push({name,color,price,monthlyEur,shares,fee:FEE_PER_ORDER,totalCost});
+      // 1 à 3 parts sur le mois → achat ponctuel unique. Frais selon le courtier.
+      const fee=state.feePerOrder!=null?state.feePerOrder:1;
+      const totalCost=monthlyEur+fee;
+      single.push({name,color,price,monthlyEur,shares,fee,totalCost});
     }
   });
   const weeklyTotal=weekly.reduce((s,e)=>s+e.weeklyEur,0);
@@ -1929,7 +2209,7 @@ function skipConfirm(){
   renderMonthly();renderHistory();
 }
 function setCalcStatus(type,msg){document.getElementById('calc-dot').className='status-dot'+(type==='live'?' live':'');document.getElementById('calc-status').textContent=msg;}
-function syncSettingsFromInputs(){state.monthly=+document.getElementById('monthly').value||500;state.maxDefer=+document.getElementById('max-defer').value||3;state.rebalMode=document.getElementById('rebal-mode').value;state.rebalMonths=+document.getElementById('rebal-months').value||12;save();}
+function syncSettingsFromInputs(){state.monthly=+document.getElementById('monthly').value||500;save();}
 function openSettings(){document.getElementById('settings-overlay').style.display='flex';}
 function closeSettings(){document.getElementById('settings-overlay').style.display='none';}
 function _dataIoStatus(msg,color){const el=document.getElementById('data-io-status');if(el){el.style.color=color||'var(--text3)';el.textContent=msg;}}
@@ -1972,9 +2252,11 @@ function importData(file){
       save();
       // Re-render complet
       document.getElementById('monthly').value=state.monthly;
-      document.getElementById('max-defer').value=state.maxDefer;
-      document.getElementById('rebal-mode').value=state.rebalMode||'asap';
-      document.getElementById('rebal-months').value=state.rebalMonths||12;
+      document.getElementById('freq').value=state.freq||'monthly';
+      document.getElementById('fee-per-order').value=state.feePerOrder!=null?state.feePerOrder:1;
+      document.getElementById('reminder-day').value=state.reminderDay||1;
+      document.getElementById('drift-alert').value=state.driftAlert||8;
+      if(typeof renderDayPicker==='function')renderDayPicker();
       renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();updateProj();
       startAutoRefresh();
       _dataIoStatus('✓ Sauvegarde importée avec succès','var(--green)');
@@ -1999,6 +2281,11 @@ async function resetAllData(){
   save();
   // 4. Réinitialiser les inputs du modal réglages
   document.getElementById('monthly').value=state.monthly;
+  document.getElementById('freq').value=state.freq||'monthly';
+  document.getElementById('fee-per-order').value=state.feePerOrder!=null?state.feePerOrder:1;
+  document.getElementById('reminder-day').value=state.reminderDay||1;
+  document.getElementById('drift-alert').value=state.driftAlert||8;
+  if(typeof renderDayPicker==='function')renderDayPicker();
   // 5. Fermer le modal, re-render toutes les vues
   closeSettings();
   renderEtfGrid();
@@ -2326,6 +2613,7 @@ function simulateDCA(monthly,months,annualReturn){
   }
   return {ok:true,series,finalEtfs:sim};
 }
+
 // Synchronisation curseur ↔ champ ↔ pas pour l'épargne/mois en Projection
 function onProjMonthlySlider(){
   const v=+document.getElementById('proj-monthly').value;
@@ -2428,28 +2716,29 @@ function updateProj(){
     chartProj.update();
   }
   const PV=Math.max(0,fv-fi),PS=0.186,FT=0.314,netA=fv-PV*PS,netB=fv-PV*FT,fmt=v=>Math.round(v).toLocaleString('fr-FR');
-  const fc=document.getElementById('proj-fiscal-card');
-  fc.innerHTML='<div class="card-title">Fiscalité PEA à la sortie</div>'
+  const fc=document.getElementById('body-fiscal');
+  fc.innerHTML=''
     +(years<5?'<div style="background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:var(--r);padding:.9rem;margin-bottom:.75rem;"><div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:.65rem;">AVANT 5 ANS — Votre horizon actuel</div><div style="font-size:12px;font-family:var(--mono);display:flex;flex-direction:column;gap:4px;"><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">IR (12.8%)</span><span style="color:var(--red)">−'+fmt(PV*.128)+' €</span></div><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">PS (18.6%)</span><span style="color:var(--red)">−'+fmt(PV*PS)+' €</span></div><div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4px;"><span style="color:var(--text3)">Total (31.4%)</span><span style="color:var(--red);font-weight:600;">−'+fmt(PV*FT)+' €</span></div></div><div style="margin-top:8px;background:var(--bg2);padding:7px 9px;border-radius:var(--r);"><div style="font-size:10px;color:var(--text3);">VALEUR NETTE</div><div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--red);">'+fmt(netB)+' €</div></div></div>':'')
     +'<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:var(--r);padding:.9rem;"><div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:.65rem;">APRÈS 5 ANS'+(years>=5?' — Votre horizon ✓':'')+'</div><div style="font-size:12px;font-family:var(--mono);display:flex;flex-direction:column;gap:4px;"><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">IR sur PV</span><span style="color:var(--green)">Exonéré ✓</span></div><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">PS (18.6%)</span><span style="color:var(--amber)">−'+fmt(PV*PS)+' €</span></div></div><div style="margin-top:8px;background:var(--bg2);padding:7px 9px;border-radius:var(--r);"><div style="font-size:10px;color:var(--text3);">VALEUR NETTE</div><div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--green);">'+fmt(netA)+' €</div></div></div>'
     +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:.75rem;">France 2026 · PS 18.6% · Avant 5 ans : PFU 31.4% · Plafond PEA : 150 000 €</div>';
   renderEtfProjection(years,monthly,ret,simBase);
+  applyCollapseState();
 }
 // ── Projection par ETF : utilise la simulation partagée (cohérente avec le graphique) ──
 function renderEtfProjection(years,monthly,retPct,simResult){
-  const card=document.getElementById('proj-etf-card');
+  const card=document.getElementById('body-etf');
   if(!card)return;
   if(!simResult||simResult.reason==='no-etfs'){
-    card.innerHTML='<div class="card-title">Projection par ETF</div><div style="font-size:12px;color:var(--text3);font-family:var(--mono);padding:.5rem 0;">Ajoute des ETF avec une allocation cible pour voir la projection détaillée.</div>';return;
+    card.innerHTML='<div style="font-size:12px;color:var(--text3);font-family:var(--mono);padding:.5rem 0;">Ajoute des ETF avec une allocation cible pour voir la projection détaillée.</div>';return;
   }
   if(!simResult.ok){
-    card.innerHTML='<div class="card-title">Projection par ETF</div><div style="font-size:12px;color:var(--amber);font-family:var(--mono);padding:.5rem 0;">⚠ Renseigne le prix de chaque ETF pour projeter l\'accumulation de parts (les prix se récupèrent normalement tout seuls).</div>';
+    card.innerHTML='<div style="font-size:12px;color:var(--amber);font-family:var(--mono);padding:.5rem 0;">⚠ Renseigne le prix de chaque ETF pour projeter l\'accumulation de parts (les prix se récupèrent normalement tout seuls).</div>';
     return;
   }
   const sim=simResult.finalEtfs;
   const totalVal=sim.reduce((s,x)=>s+x.shares*x.price,0);
   const totalInv=sim.reduce((s,x)=>s+x.invested,0);
-  let html='<div class="card-title">Projection par ETF — dans '+years+' an'+(years>1?'s':'')+'</div>'
+  let html='<div style="font-size:12px;font-weight:600;margin-bottom:.3rem;">Dans '+years+' an'+(years>1?'s':'')+'</div>'
     +'<div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:.85rem;">Estimation de l\'accumulation de parts au rythme DCA actuel (rendement '+retPct+'%/an, prix projetés)</div>';
   html+='<div style="display:flex;flex-direction:column;gap:8px;">';
   sim.forEach((s,i)=>{
@@ -2477,38 +2766,70 @@ function renderEtfProjection(years,monthly,retPct,simResult){
   html+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'
     +'<div><div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:.05em;">VALEUR TOTALE EST.</div><div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--accent);">'+totalVal.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €</div></div>'
     +'<div><div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:.05em;">TOTAL INVESTI</div><div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--text2);">'+totalInv.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €</div></div>'
-    +'<div><div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:.05em;">PLUS-VALUE TOTALE</div><div style="font-size:18px;font-weight:600;font-family:var(--mono);color:'+(totalGain>=0?'var(--green)':'var(--red)')+';">'+(totalGain>=0?'+':'')+totalGain.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €</div></div>'
+    +'<div><div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:.05em;">PLUS-VALUE EST.</div><div style="font-size:18px;font-weight:600;font-family:var(--mono);color:'+(totalGain>=0?'var(--green)':'var(--red)')+';">'+(totalGain>=0?'+':'')+totalGain.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €</div></div>'
     +'</div>';
   html+='<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:.75rem;">Estimation indicative : rendement constant supposé, prix évoluant au même rythme pour tous les ETF. Les parts réelles dépendront des prix de marché.</div>';
   card.innerHTML=html;
 }
 document.getElementById('monthly').value=state.monthly;
 document.getElementById('freq').value=state.freq||'monthly';
-document.getElementById('max-defer').value=state.maxDefer||3;
-document.getElementById('rebal-mode').value=state.rebalMode||'asap';
-document.getElementById('rebal-months').value=state.rebalMonths||12;
-document.getElementById('rebal-mode').addEventListener('change',function(){document.getElementById('rebal-months-wrap').style.display=this.value==='months'?'flex':'none';});
-if(state.rebalMode==='months')document.getElementById('rebal-months-wrap').style.display='flex';
+document.getElementById('fee-per-order').value=state.feePerOrder!=null?state.feePerOrder:1;
+document.getElementById('reminder-day').value=state.reminderDay||1;
+document.getElementById('drift-alert').value=state.driftAlert||8;
+// Sélecteur visuel du jour de rappel (grille 1-28, repliable)
+function renderDayPicker(){
+  const box=document.getElementById('reminder-day-picker');if(!box)return;
+  const sel=+document.getElementById('reminder-day').value||1;
+  const lbl=document.getElementById('reminder-day-label');if(lbl)lbl.textContent=sel;
+  let h='';
+  for(let d=1;d<=28;d++){h+='<div class="day-cell'+(d===sel?' sel':'')+'" data-day="'+d+'">'+d+'</div>';}
+  box.innerHTML=h;
+  box.querySelectorAll('.day-cell').forEach(c=>{
+    c.onclick=()=>{
+      document.getElementById('reminder-day').value=c.getAttribute('data-day');
+      renderDayPicker();
+      // fermeture animée après le choix
+      box.style.animation='dayPickerOut .2s ease forwards';
+      setTimeout(()=>{box.style.display='none';box.style.animation='';},190);
+      document.getElementById('reminder-day').dispatchEvent(new Event('input',{bubbles:true}));
+    };
+  });
+}
+function toggleDayPicker(){
+  const box=document.getElementById('reminder-day-picker');if(!box)return;
+  const open=box.style.display!=='none';
+  if(open){
+    // Fermeture animée
+    box.style.animation='dayPickerOut .2s ease forwards';
+    setTimeout(()=>{box.style.display='none';box.style.animation='';},190);
+  }else{
+    box.style.display='grid';
+    box.style.animation='dayPickerIn .25s cubic-bezier(.22,1,.36,1)';
+  }
+}
+window.toggleDayPicker=toggleDayPicker;
+renderDayPicker();
 // Synchronisation temps réel des paramètres DCA → state + bandeau + projection
 (function(){
   const sync=()=>{
     state.monthly=+document.getElementById('monthly').value||500;
     state.freq=document.getElementById('freq').value;
-    state.maxDefer=+document.getElementById('max-defer').value||3;
-    state.rebalMode=document.getElementById('rebal-mode').value;
-    state.rebalMonths=+document.getElementById('rebal-months').value||12;
+    const fee=parseFloat(document.getElementById('fee-per-order').value);
+    state.feePerOrder=isNaN(fee)||fee<0?0:fee;
+    state.reminderDay=Math.min(28,Math.max(1,+document.getElementById('reminder-day').value||1));
+    state.driftAlert=Math.min(50,Math.max(1,+document.getElementById('drift-alert').value||8));
     save();
     updateHealthBar();
-    // si on est sur l'onglet projection, rafraîchir la courbe
+    renderMonthly(); // le plan dépend des frais
     const pp=document.getElementById('page-projection');
     if(pp&&pp.classList.contains('active'))updateProj();
   };
-  ['monthly','max-defer','rebal-months'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',sync);});
-  ['freq','rebal-mode'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('change',sync);});
+  ['monthly','fee-per-order','reminder-day','drift-alert'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',sync);});
+  ['freq'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('change',sync);});
 })();
 window.nav=nav;window.calculate=calculate;window.triggerRefresh=triggerRefresh;
-window.addEtfBlank=addEtfBlank;window.addEtfFromSearch=addEtfFromSearch;window.removeEtf=removeEtf;window.removeEtfFromHome=removeEtfFromHome;
-window.resolveSingle=resolveSingle;window.onIdentInputById=onIdentInputById;window.onEtfSearch=onEtfSearch;
+window.addEtfBlank=addEtfBlank;window.openEtfLibrary=openEtfLibrary;window.removeEtf=removeEtf;window.removeEtfFromHome=removeEtfFromHome;
+window.resolveSingle=resolveSingle;window.onIdentInputById=onIdentInputById;
 window.setMode=setMode;window.saveQuickUpdate=saveQuickUpdate;
 window.openImportModal=openImportModal;window.closeImportModal=closeImportModal;
 window.handleCsvFile=handleCsvFile;window.applyImport=applyImport;
