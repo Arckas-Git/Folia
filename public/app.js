@@ -334,7 +334,7 @@ function updateHealthBar(){
   const da=state.driftAlert||8;
   const de=document.getElementById('hb-drift');de.textContent=md.toFixed(1)+'%';de.className='health-value '+(md<da*0.4?'green':md<da?'amber':'red');
   document.getElementById('hb-monthly').textContent=state.monthly.toLocaleString('fr-FR')+' €';
-  document.getElementById('hb-freq').textContent=state.freq==='weekly'?'Hebdomadaire':'Mensuelle';
+  document.getElementById('hb-freq').textContent=state.freq==='weekly'?'Hebdomadaire':(state.freq==='biweekly'?'Bimensuelle':'Mensuelle');
   const w=document.getElementById('reminder-wrap');
   const last=state.lastCalcDate?new Date(state.lastCalcDate):null;
   const now=new Date();
@@ -1518,12 +1518,13 @@ function renderPlanOrders(pending){
     +'<div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">ORDRES</div><div style="font-size:17px;font-weight:600;font-family:var(--mono);">'+buys.length+'</div></div>'
     +(totalFees>0?'<div><div style="font-size:10px;color:var(--text3);font-family:var(--mono);">FRAIS EST.</div><div style="font-size:17px;font-weight:600;font-family:var(--mono);color:var(--text2);">'+totalFees.toFixed(2)+' €</div></div>':'')
     +'</div>';
-  if(totalFees>0&&state.freq!=='weekly'){
+  const _staggered=(state.freq==='weekly'||state.freq==='biweekly'); // modes étalés (hebdo/bimensuel)
+  if(totalFees>0&&!_staggered){
     html+='<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin:-6px 0 12px;line-height:1.4;">Coût total estimé : <strong>'+(totalSpent+totalFees).toFixed(2)+' €</strong> ('+buys.length+' ordre'+(buys.length>1?'s':'')+' × '+feePer.toFixed(2)+' € de frais). Les frais ne sont pas investis.</div>';
   }
 
   // ── Ordres à passer (MODE MENSUEL uniquement) ────────────────────
-  if(buys.length&&state.freq!=='weekly'){
+  if(buys.length&&!_staggered){
     html+='<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;margin-top:4px;display:flex;align-items:center;gap:6px;">'
       +'<span style="width:3px;height:11px;background:var(--green);border-radius:2px;display:inline-block;"></span>À acheter maintenant</div>';
     buys.forEach((d,i)=>{
@@ -1544,17 +1545,20 @@ function renderPlanOrders(pending){
     });
   }
 
-  // ── Plan hebdomadaire (si fréquence = hebdo) ──────────────────────
-  if(state.freq==='weekly'&&buys.length){
-    const weeks=4; // 4 versements par mois
+  // ── Plan étalé (si fréquence = hebdo ou bimensuelle) ──────────────
+  if((state.freq==='weekly'||state.freq==='biweekly')&&buys.length){
+    const isWeekly=state.freq==='weekly';
+    const weeks=isWeekly?4:2;            // 4 versements/mois (hebdo) ou 2 (bimensuel)
+    const perLabel=isWeekly?'semaine':'quinzaine';   // "/ semaine" ou "/ quinzaine"
+    const perAdj=isWeekly?'hebdomadaire':'bimensuel'; // pour les textes d'aide
     const {weekly,single,weeklyTotal}=buildWeeklyPlan(buys,weeks);
 
-    // ── Bloc 1 : ordres programmés hebdomadaires (sans frais) ──
+    // ── Bloc 1 : ordres programmés (sans frais) ──
     if(weekly.length){
       html+='<div style="margin:14px 0 6px;"><div class="info-row" style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;">'
-        +'<span style="width:3px;height:11px;background:var(--accent);border-radius:2px;display:inline-block;"></span>À programmer chaque semaine'
+        +'<span style="width:3px;height:11px;background:var(--accent);border-radius:2px;display:inline-block;"></span>À programmer chaque '+perLabel
         +'<span class="info-ic" onclick="toggleInfo(this)">i</span></div>'
-        +'<div class="info-tip">Ordres programmés chez ton courtier. Le montant achète le maximum de parts entières possible chaque semaine.</div></div>';
+        +'<div class="info-tip">Ordres programmés chez ton courtier. Le montant achète le maximum de parts entières possible chaque '+perLabel+'.</div></div>';
       weekly.forEach(e=>{
         html+='<div style="background:rgba(79,142,247,.04);border:1px solid rgba(79,142,247,.15);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;">'
           +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">'
@@ -1563,8 +1567,8 @@ function renderPlanOrders(pending){
           +'</div>'
           +'<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:5px;">'
           +'<span style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--accent);">'+e.weeklyEur.toFixed(2)+' €</span>'
-          +'<span style="font-size:12px;color:var(--text2);">/ semaine</span>'
-          +'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:auto;">≈ '+e.approxShares.toFixed(1)+' part'+(e.approxShares>=2?'s':'')+'/sem</span>'
+          +'<span style="font-size:12px;color:var(--text2);">/ '+perLabel+'</span>'
+          +'<span style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-left:auto;">≈ '+e.approxShares.toFixed(1)+' part'+(e.approxShares>=2?'s':'')+'/'+perLabel+'</span>'
           +'</div>'
           +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);line-height:1.4;border-top:1px solid var(--border);padding-top:6px;">'
           +'Sur le mois : '+e.monthlyEur.toFixed(2)+' € dans cet ETF'
@@ -1572,16 +1576,16 @@ function renderPlanOrders(pending){
           +'</div>';
       });
       html+='<div style="font-size:11px;font-family:var(--mono);color:var(--text2);margin-top:4px;padding:8px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);">'
-        +'Total programmé : <strong>'+weeklyTotal.toFixed(2)+' € / semaine</strong>'
+        +'Total programmé : <strong>'+weeklyTotal.toFixed(2)+' € / '+perLabel+'</strong>'
         +'</div>';
     }
 
-    // ── Bloc 2 : achats uniques ce mois (ETF chers : 1 à 3 parts, non étalables) ──
+    // ── Bloc 2 : achats uniques ce mois (ETF chers, non étalables) ──
     if(single.length){
       html+='<div style="margin:16px 0 6px;"><div class="info-row" style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;">'
         +'<span style="width:3px;height:11px;background:var(--green);border-radius:2px;display:inline-block;"></span>À acheter en une fois ce mois-ci'
         +'<span class="info-ic" onclick="toggleInfo(this)">i</span></div>'
-        +'<div class="info-tip">Ces ETF sont trop chers pour un étalement hebdomadaire (moins d\'une part par semaine). Achète-les en un seul ordre ponctuel en début de mois. Des frais peuvent s\'appliquer sur cet ordre selon ton courtier.</div></div>';
+        +'<div class="info-tip">Ces ETF sont trop chers pour un étalement '+perAdj+' (moins d\'une part par '+perLabel+'). Achète-les en un seul ordre ponctuel en début de mois. Des frais peuvent s\'appliquer sur cet ordre selon ton courtier.</div></div>';
       single.forEach(e=>{
         html+='<div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.18);border-radius:var(--r);padding:11px 13px;margin-bottom:7px;">'
           +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">'
@@ -1601,7 +1605,7 @@ function renderPlanOrders(pending){
     }
 
     html+='<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:7px;line-height:1.45;">'
-      +'⚠ En PEA, seules les parts entières sont achetées. Les montants hebdomadaires sont calculés pour atteindre, sur le mois, exactement les achats prévus ci-dessus.</div>';
+      +'⚠ En PEA, seules les parts entières sont achetées. Les montants par '+perLabel+' sont calculés pour atteindre, sur le mois, exactement les achats prévus ci-dessus.</div>';
   }
 
   // ── Reportés ──────────────────────────────────────────────────────
@@ -1680,8 +1684,8 @@ function buildWeeklyPlan(buys,weeks){
     const monthlyEur=d.spent;            // = shares * price
     const color=COLORS_INDEX(d);
     const name=d.displayName||d.name;
-    // Étalable en hebdo seulement si on achète au moins 4 parts ce mois
-    // (≈ 1 part par semaine sur 4 semaines).
+    // Étalable seulement si on achète au moins autant de parts que de versements
+    // (≈ 1 part par versement : 4 en hebdo, 2 en bimensuel).
     if(shares>=weeks){
       const weeklyEur=monthlyEur/weeks;
       single.length; // no-op lisibilité
