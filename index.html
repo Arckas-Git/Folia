@@ -70,12 +70,7 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 }
 .card-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.9rem;display:flex;align-items:center;gap:8px;}
 .card-title::before{content:'';width:3px;height:12px;background:var(--accent);border-radius:2px;}
-.onboarding{background:linear-gradient(135deg,var(--bg2),rgba(79,142,247,.04));border:1px solid rgba(79,142,247,.2);border-radius:var(--r2);padding:1.5rem;margin-bottom:1.25rem;}
-.onboarding-step{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:border-color .15s;margin-top:8px;}
-.onboarding-step:hover{border-color:var(--border2);}
-.onboarding-step.done{border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.04);}
-.step-num{width:26px;height:26px;border-radius:50%;background:var(--bg4);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--text3);flex-shrink:0;}
-.onboarding-step.done .step-num{background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:var(--green);}
+.onboarding{background:linear-gradient(135deg,var(--bg2),rgba(79,142,247,.04));border:1px solid rgba(79,142,247,.2);border-radius:var(--r2);padding:1.25rem 1.5rem;margin-bottom:1.25rem;}
 .flow-layout{display:grid;grid-template-columns:330px 1fr 340px;gap:1.25rem;align-items:start;}
 @media(max-width:1150px){.flow-layout{grid-template-columns:1fr 1fr;}}
 @media(max-width:640px){.flow-layout{grid-template-columns:1fr;}}
@@ -125,6 +120,13 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 .etf-field label{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em;}
 .etf-field input{width:100%;padding:6px 9px;height:31px;font-size:12px;}
 .etf-field input[type=number]{text-align:right;}
+/* Masquer les flèches d'incrémentation (spinners) des champs numériques.
+   Firefox les affiche en permanence, Chrome/Safari au survol — on uniformise
+   en les retirant partout pour une lecture plus propre. Les flèches clavier ↑↓
+   continuent de fonctionner. */
+input[type=number]{-moz-appearance:textfield;appearance:textfield;}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 .etf-ticker-row{display:flex;gap:5px;}.etf-ticker-row input{flex:1;}
 .btn-sm{height:31px;padding:0 9px;font-size:12px;cursor:pointer;border-radius:var(--r);}
 .btn-resolve{background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);color:var(--accent);}
@@ -197,6 +199,24 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 .day-cell{font-size:11px;font-family:var(--mono);text-align:center;padding:5px 0;border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text2);transition:all .15s ease;user-select:none;}
 .day-cell:hover{border-color:var(--border2);background:var(--bg3);}
 .day-cell.sel{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+/* ── Tutoriel guidé (product tour) ─────────────────────────────── */
+#tour-overlay{position:fixed;inset:0;z-index:10000;pointer-events:none;}
+#tour-overlay.blocking{pointer-events:auto;}
+#tour-overlay svg{position:absolute;inset:0;width:100%;height:100%;}
+#tour-overlay .tour-mask-bg{fill:rgba(8,9,11,.74);transition:all .3s cubic-bezier(.22,1,.36,1);}
+.tour-highlight{position:fixed;z-index:10001;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 4px rgba(79,142,247,.25),0 0 24px rgba(79,142,247,.35);pointer-events:none;transition:all .3s cubic-bezier(.22,1,.36,1);}
+.tour-bubble{position:fixed;z-index:10002;width:300px;max-width:90vw;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);padding:1rem 1.1rem;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:tourPop .28s cubic-bezier(.22,1,.36,1);}
+@keyframes tourPop{from{opacity:0;transform:translateY(6px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
+.tour-bubble .tour-step-count{font-size:10px;font-family:var(--mono);color:var(--accent);letter-spacing:.08em;text-transform:uppercase;}
+.tour-bubble .tour-title{font-size:14px;font-weight:600;margin:5px 0 6px;}
+.tour-bubble .tour-text{font-size:12px;color:var(--text2);line-height:1.5;}
+.tour-bubble .tour-actions{display:flex;align-items:center;gap:8px;margin-top:12px;}
+.tour-bubble .tour-next{background:var(--accent);color:#fff;font-size:12px;font-weight:600;border:none;padding:7px 14px;border-radius:var(--r);cursor:pointer;}
+.tour-bubble .tour-next:hover{background:var(--accent2);}
+.tour-bubble .tour-skip{background:transparent;border:none;color:var(--text3);font-size:11px;font-family:var(--mono);cursor:pointer;margin-left:auto;}
+.tour-bubble .tour-skip:hover{color:var(--text2);}
+.tour-bubble .tour-wait{font-size:11px;font-family:var(--mono);color:var(--text3);font-style:italic;}
+@media(prefers-reduced-motion:reduce){.tour-highlight,.tour-bubble,#tour-overlay .tour-mask-bg{transition:none;animation:none;}}
 /* Modale de confirmation maison */
 .confirm-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r2);padding:1.3rem;width:380px;max-width:92vw;display:flex;flex-direction:column;gap:1.1rem;animation:confirmPop .22s cubic-bezier(.22,1,.36,1);}
 @keyframes confirmPop{from{opacity:0;transform:scale(.94) translateY(8px);}to{opacity:1;transform:scale(1) translateY(0);}}
@@ -250,32 +270,17 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 </div>
 <!-- CE MOIS-CI -->
 <div class="page active" id="page-monthly">
-  <div class="onboarding" id="onboarding" style="display:none;">
-    <div style="font-size:18px;font-weight:600;margin-bottom:.4rem;">Bienvenue sur Folia &#128075;</div>
-    <div style="font-size:13px;color:var(--text2);margin-bottom:.75rem;">Quelques étapes pour démarrer ton DCA automatique.</div>
-    <!-- Étape 1 : Ajouter ses ETF (import CSV ou manuel) -->
-    <div class="onboarding-step" id="ob-step1" onclick="openImportModal()">
-      <div class="step-num" id="ob-num1">1</div>
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:600;">Ajouter tes ETF</div>
-        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;">Importe le CSV de ton courtier, ou ajoute-les à la main dans "Mon portefeuille"</div>
+  <div class="onboarding" id="onboarding" style="display:none;position:relative;">
+    <button onclick="dismissOnboarding()" title="Masquer" style="position:absolute;top:10px;right:12px;background:transparent;border:none;color:var(--text3);font-size:18px;cursor:pointer;line-height:1;padding:2px 4px;">&#215;</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:16px;font-weight:600;margin-bottom:.3rem;">Bienvenue sur Folia &#128075;</div>
+        <div style="font-size:12px;color:var(--text2);">Pour démarrer : ajoute tes ETF et fixe leur répartition cible. La visite guidée te montre comment, en moins d'une minute.</div>
       </div>
-      <div style="font-size:12px;color:var(--accent);font-weight:500;" id="ob-action1">Importer →</div>
-    </div>
-    <!-- Étape 2 : Allocations cibles + épargne mensuelle -->
-    <div class="onboarding-step" id="ob-step2" onclick="nav('portfolio')">
-      <div class="step-num" id="ob-num2">2</div>
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:600;">Définir tes allocations &amp; ton épargne</div>
-        <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;">Fixe le % cible de chaque ETF et ton montant mensuel</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="startTour()" style="background:var(--accent);color:#fff;border:none;font-size:12px;font-weight:600;padding:9px 16px;border-radius:var(--r);cursor:pointer;white-space:nowrap;">✨ Visite guidée</button>
+        <button onclick="nav('portfolio')" style="background:transparent;border:1px solid var(--border2);color:var(--text2);font-size:12px;padding:9px 16px;border-radius:var(--r);cursor:pointer;white-space:nowrap;">Configurer manuellement</button>
       </div>
-      <div style="font-size:12px;color:var(--accent);font-weight:500;" id="ob-action2">Configurer →</div>
-    </div>
-    <!-- Étape 3 : Calculer -->
-    <div class="onboarding-step" id="ob-step3" onclick="calculate()">
-      <div class="step-num" id="ob-num3">3</div>
-      <div style="flex:1;"><div style="font-size:13px;font-weight:600;">Calculer ton plan du mois</div><div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;">Folia te dit exactement quoi acheter et combien</div></div>
-      <div style="font-size:12px;color:var(--accent);font-weight:500;" id="ob-action3">Calculer →</div>
     </div>
   </div>
   <div class="flow-layout">
@@ -376,7 +381,8 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
       </div>
       <div class="etf-grid" id="etf-grid"></div>
       <div style="display:flex;gap:8px;margin-top:5px;flex-wrap:wrap;">
-        <button class="btn-add" style="flex:1;margin-top:0;" onclick="openEtfLibrary()">+ Ajouter un ETF</button>
+        <button class="btn-add" style="flex:1;margin-top:0;" onclick="addEtfBlankAndScroll()">+ Ajouter un ETF</button>
+        <button class="btn-ghost" style="margin-top:0;white-space:nowrap;" onclick="openEtfLibrary()" title="Choisir parmi tes ETF connus ou retirés">&#128218; Bibliothèque</button>
       </div>
       <div class="alloc-total" id="alloc-total"></div>
     </div>
@@ -474,6 +480,10 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
       <div id="td-status" style="display:none;"></div>
     </div>
     <div>
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Aide</div>
+      <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="closeSettings();setTimeout(startTour,200)">✨ Revoir la visite guidée</button>
+    </div>
+    <div>
       <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Données</div>
       <div style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-bottom:9px;">Tes données sont enregistrées dans ce navigateur. Exporte une sauvegarde pour les conserver ailleurs ou les transférer sur un autre appareil.</div>
       <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="exportData()">&#11015; Exporter mes données (sauvegarde)</button>
@@ -493,9 +503,14 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
     <label for="csv-file" class="import-zone-label" id="import-zone"><div style="font-size:28px;margin-bottom:.4rem;">&#128196;</div><div style="font-size:13px;color:var(--text2);">Glisse ton CSV ici ou clique pour sélectionner</div></label>
     <input type="file" id="csv-file" accept=".csv" style="display:none;"/>
     <div id="import-preview"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin:14px 0 4px;color:var(--text3);font-size:11px;font-family:var(--mono);">
+      <div style="flex:1;height:1px;background:var(--border);"></div>OU<div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:8px;">Pas de CSV sous la main ? Tu peux ajouter tes ETF un par un, à la main.</p>
+    <button class="btn-ghost" style="width:100%;" onclick="goToManualEntry()">Ajouter mes ETF manuellement →</button>
   </div>
 </div>
-<footer>Folia · v1.32.1 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.38.1 · Planificateur DCA PEA · Données indicatives</footer>
 <script>
 document.addEventListener('DOMContentLoaded',function(){
 
@@ -562,7 +577,9 @@ const DEFAULT_STATE={
   twelveDataKey:'',uiMode:'simple',lastCalcDate:null,pendingOrders:null,
   subChoices:{}, // {etfId: subIndex} — quel émetteur acheter pour chaque ETF groupe
   _deferCounters:{}, // {etfId: nb de mois consécutifs où l'ETF a été reporté}
-  _archivedEtfs:[] // ETF supprimés, conservés pour récupération via la bibliothèque
+  _archivedEtfs:[], // ETF supprimés, conservés pour récupération via la bibliothèque
+  _tourDone:false, // visite guidée déjà vue/passée ?
+  _obDismissed:false // bannière de bienvenue fermée manuellement ?
 };
 
 let state=load()||JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -714,7 +731,8 @@ function confirmModal(message,opts){
   return new Promise(resolve=>{
     const ov=document.createElement('div');ov.className='overlay';ov.style.zIndex='9999';
     const box=document.createElement('div');box.className='confirm-box';
-    const msg=document.createElement('div');msg.className='confirm-msg';msg.textContent=message;
+    const msg=document.createElement('div');msg.className='confirm-msg';
+    if(opts.html)msg.innerHTML=message;else msg.textContent=message;
     const actions=document.createElement('div');actions.className='confirm-actions';
     const cancel=document.createElement('button');cancel.className='btn-ghost';cancel.style.flex='1';cancel.textContent=opts.cancelText||'Annuler';
     const ok=document.createElement('button');ok.className='btn-add';ok.style.cssText='flex:1;margin:0;'+(opts.danger?'background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.3);color:var(--red);':'');ok.textContent=opts.okText||'Confirmer';
@@ -743,11 +761,24 @@ function toggleCollapse(key){
   const body=document.getElementById('body-'+key);
   if(!head||!body)return;
   const willClose=!body.classList.contains('closed');
-  body.classList.toggle('closed',willClose);
-  head.classList.toggle('closed',willClose);
-  if(!willClose){
-    // À l'ouverture, fixer max-height à la hauteur réelle du contenu pour l'animation
+  if(willClose){
+    // Fermeture : repartir de la hauteur réelle actuelle puis laisser le CSS animer vers 0
     body.style.maxHeight=body.scrollHeight+'px';
+    void body.offsetHeight; // reflow pour que le navigateur prenne la hauteur de départ
+    body.classList.add('closed');
+    head.classList.add('closed');
+    body.style.maxHeight=''; // laisse la règle .closed (max-height:0) gérer l'animation
+  } else {
+    // Ouverture : animer jusqu'à la hauteur du contenu...
+    head.classList.remove('closed');
+    body.classList.remove('closed');
+    body.style.maxHeight=body.scrollHeight+'px';
+    // ...puis libérer la contrainte une fois l'animation finie, pour que le bloc
+    // s'adapte si son contenu grandit ensuite (graphique redessiné, données chargées).
+    const release=()=>{body.style.maxHeight='none';body.removeEventListener('transitionend',release);};
+    body.addEventListener('transitionend',release);
+    // garde-fou si transitionend ne se déclenche pas (animation désactivée)
+    setTimeout(release,400);
   }
   if(!state._collapsed)state._collapsed={};
   state._collapsed[key]=willClose;save();
@@ -763,7 +794,8 @@ function applyCollapseState(){
     const closed=state._collapsed&&state._collapsed[key]!=null?state._collapsed[key]:def[key];
     body.classList.toggle('closed',closed);
     head.classList.toggle('closed',closed);
-    if(!closed)body.style.maxHeight=body.scrollHeight+'px';
+    // Bloc ouvert : pas de contrainte de hauteur (évite le contenu coupé après redessin)
+    body.style.maxHeight=closed?'':'none';
   });
 }
 window.applyCollapseState=applyCollapseState;
@@ -830,38 +862,18 @@ function updateHealthBar(){
   }
 }
 function updateOnboarding(){
-  // Nouvel ordre : 1) ajouter ETF  2) allocations + épargne  3) calculer
+  // La bannière de bienvenue guide le tout début. Elle disparaît dès que la config
+  // de base est là (au moins un ETF + allocations à ~100 %) — le calcul est ensuite
+  // encouragé par le bandeau de rappel. L'utilisateur peut aussi la fermer à la main.
   const hasAnyEtf=state.etfs.length>0;
   const allocOk=state.etfs.some(e=>e.target>0)&&Math.abs(state.etfs.reduce((s,e)=>s+(+e.target||0),0)-100)<0.5;
-  const hasCalc=!!state.lastCalcDate;
   const ob=document.getElementById('onboarding');
-  if(hasAnyEtf&&allocOk&&hasCalc){ob.style.display='none';return;}
-  ob.style.display='block';
-  const setStep=(id,done,inProgress,accent)=>{
-    const s=document.getElementById('ob-step'+id);
-    const num=document.getElementById('ob-num'+id);
-    const act=document.getElementById('ob-action'+id);
-    if(!s)return;
-    if(done){
-      s.classList.add('done');
-      if(num)num.textContent='✓';
-      if(act){act.textContent='Fait ✓';act.style.color='var(--green)';}
-      s.style.cursor='default';
-    } else {
-      s.classList.remove('done');
-      if(act){act.style.color=accent||'var(--accent)';}
-      s.style.cursor='pointer';
-      s.style.borderColor=inProgress?'rgba(79,142,247,.4)':'';
-      s.style.background=inProgress?'rgba(79,142,247,.04)':'';
-    }
-  };
-  // Étape 1 : avoir au moins un ETF
-  setStep(1,hasAnyEtf,!hasAnyEtf);
-  // Étape 2 : allocations cibles à 100% (l'épargne a une valeur par défaut, donc on valide sur l'alloc)
-  setStep(2,allocOk,hasAnyEtf&&!allocOk);
-  // Étape 3 : calculer (active dès que l'alloc est OK)
-  setStep(3,hasCalc,allocOk&&!hasCalc);
+  if(!ob)return;
+  const hide=state._obDismissed||(hasAnyEtf&&allocOk);
+  ob.style.display=hide?'none':'block';
 }
+function dismissOnboarding(){state._obDismissed=true;save();const ob=document.getElementById('onboarding');if(ob)ob.style.display='none';}
+window.dismissOnboarding=dismissOnboarding;
 function renderMonthly(){
   updateHealthBar();updateOnboarding();renderAllocOverview();renderQuickUpdate();renderPieChart();
   renderSubChoices();
@@ -1160,16 +1172,14 @@ async function removeSubEtf(eid,si){
     // Plus de subs — redevient ETF solo
     delete etf.subs;
   } else if(etf.subs.length===1){
-    // Un seul sub restant — demander si on veut fusionner
-    if(await confirmModal('Un seul émetteur restant. Convertir en ETF solo ?',{okText:'Convertir'})){
-      const sub=etf.subs[0];
-      etf.isin=sub.isin||'';etf.ticker=sub.ticker||'';
-      etf.shares=sub.shares||0;etf.avgPrice=sub.avgPrice||0;
-      if(sub.name)etf.name=sub.name;
-      delete etf.subs;
-    }
+    // Un seul émetteur restant : l'ETF est de fait un solo → conversion automatique.
+    const sub=etf.subs[0];
+    etf.isin=sub.isin||'';etf.ticker=sub.ticker||'';
+    etf.shares=sub.shares||0;etf.avgPrice=sub.avgPrice||0;
+    if(sub.name)etf.name=sub.name;
+    delete etf.subs;
   }
-  save();renderEtfGrid();
+  save();renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();
 }
 function setSubField(eid,si,field,val){
   const etf=state.etfs.find(e=>e.id===eid);if(!etf||!etf.subs||!etf.subs[si])return;
@@ -1215,6 +1225,9 @@ async function resolveSubEtf(eid,si){
   updateMonthlyBaseline(sub);
   sub.avgPrice=info.price;
   if(info.name&&!sub.name)sub.name=info.name;
+  // Rafraîchir le nom affiché de l'émetteur (span) après résolution
+  const nameEl=document.getElementById('sub-name-'+eid+'-'+si);
+  if(nameEl&&sub.name)nameEl.textContent=sub.name;
   const priceEl=document.getElementById('sub-price-'+eid+'-'+si);
   if(priceEl){priceEl.value=info.price.toFixed(2);priceEl.style.color='var(--green)';setTimeout(()=>{priceEl.style.color='';},2000);}
   const subVal=(sub.shares||0)*(sub.avgPrice||0);
@@ -1229,7 +1242,29 @@ window.addSubEtf=addSubEtf;
 window.removeSubEtf=removeSubEtf;
 window.setSubField=setSubField;
 window.resolveSubEtf=resolveSubEtf;
+// Résolution auto d'un sous-ETF (émetteur) quand un ISIN valide vient d'être saisi.
+async function autoResolveSubEtf(eid,si){
+  const etf=state.etfs.find(e=>e.id===eid);if(!etf||!etf.subs||!etf.subs[si])return;
+  const sub=etf.subs[si];
+  if(!sub.isin||!isISIN(sub.isin))return;       // seulement sur un ISIN valide
+  if(sub.avgPrice>0&&sub.name)return;            // déjà résolu/renseigné
+  await resolveSubEtf(eid,si);
+}
+window.autoResolveSubEtf=autoResolveSubEtf;
 function addEtfBlank(){pushUndo('ajout d\'un ETF');state.etfs.push({id:state.nextId++,name:'',ticker:'',isin:'',target:0,shares:0,avgPrice:0});save();renderEtfGrid();}
+// Ajoute un ETF vide puis défile jusqu'à lui et met le focus sur le champ ISIN.
+function addEtfBlankAndScroll(){
+  pushUndo('ajout d\'un ETF');
+  const id=state.nextId++;
+  state.etfs.push({id,name:'',ticker:'',isin:'',target:0,shares:0,avgPrice:0});
+  save();renderEtfGrid();
+  setTimeout(()=>{
+    const card=document.getElementById('etf-card-'+id);
+    if(card){card.scrollIntoView({behavior:'smooth',block:'center'});
+      const inp=document.getElementById('ident-'+id);if(inp)inp.focus();}
+  },80);
+}
+window.addEtfBlankAndScroll=addEtfBlankAndScroll;
 // Archive l'identité d'un ETF supprimé dans la bibliothèque (récupérable ensuite).
 // Ne stocke que nom/ISIN/ticker (pas les parts) — l'utilisateur les ressaisira.
 function archiveEtf(etf){
@@ -1333,12 +1368,12 @@ function renderEtfGrid(){
         subsBody+='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:9px 11px;">'
           +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;">'
           +'<span style="font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:3px;background:rgba(79,142,247,.1);color:var(--accent);">Émetteur '+(si+1)+'</span>'
-          +'<span style="font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(sub.name||sub.isin||'—')+'</span>'
+          +'<span id="sub-name-'+eid+'-'+si+'" style="font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(sub.name||sub.isin||'—')+'</span>'
           +'<button onclick="removeSubEtf('+eid+','+si+')" style="background:transparent;border:none;color:var(--text3);font-size:14px;padding:0 3px;cursor:pointer;line-height:1;" onmouseover="this.style.color=\'var(--red)\'" onmouseout="this.style.color=\'var(--text3)\'">×</button>'
           +'</div>'
           // Ligne identifiant
           +'<div class="etf-ticker-row" style="margin-bottom:7px;">'
-          +'<input type="text" id="sub-ident-'+eid+'-'+si+'" value="'+subIdentVal+'" placeholder="ISIN ou ticker" oninput="setSubField('+eid+','+si+',\'ident\',this.value)"/>'
+          +'<input type="text" id="sub-ident-'+eid+'-'+si+'" value="'+subIdentVal+'" placeholder="ISIN ou ticker" oninput="setSubField('+eid+','+si+',\'ident\',this.value)" onchange="autoResolveSubEtf('+eid+','+si+')"/>'
           +'<button class="btn-sm btn-resolve" onclick="resolveSubEtf('+eid+','+si+')" title="Récupérer prix">⟳</button>'
           +'<a href="'+justEtfLink(sub)+'" target="_blank" class="btn-sm btn-yf" id="sub-jef-'+eid+'-'+si+'">↗</a>'
           +'</div>'
@@ -1364,13 +1399,15 @@ function renderEtfGrid(){
       +'<div class="etf-card-body">';
 
     if(!hasSubs){
-      // ETF solo — champ ident + parts
-      body+='<div class="etf-field" style="grid-column:1/-1;"><label>Ticker ou ISIN</label>'
+      // ETF solo — champ ident (ISIN en priorité) + parts
+      body+='<div class="etf-field" style="grid-column:1/-1;"><label>ISIN (recommandé) ou ticker</label>'
         +'<div class="etf-ticker-row">'
-        +'<input type="text" id="ident-'+eid+'" value="'+identVal+'" placeholder="CW8.PA ou LU0996…" oninput="onIdentInputById('+eid+',this.value)"/>'
-        +'<button class="btn-sm btn-resolve" id="resolve-btn-'+eid+'" onclick="resolveSingle('+i+')">⟳</button>'
-        +'<a id="jef-'+eid+'" href="'+justEtfLink(etf)+'" target="_blank" class="btn-sm btn-yf">↗</a>'
-        +'</div>'+identHint+'</div>'
+        +'<input type="text" id="ident-'+eid+'" value="'+identVal+'" placeholder="Ex : LU0996182563" oninput="onIdentInputById('+eid+',this.value)" onchange="autoResolveEtf('+i+')"/>'
+        +'<button class="btn-sm btn-resolve" id="resolve-btn-'+eid+'" onclick="resolveSingle('+i+')" title="Rechercher le nom et le prix">⟳</button>'
+        +'<a id="jef-'+eid+'" href="'+justEtfLink(etf)+'" target="_blank" class="btn-sm btn-yf" title="Voir sur justETF">↗</a>'
+        +'</div>'
+        +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:3px;line-height:1.4;">Saisis l\'ISIN (12 caractères, ex. LU0996182563) : Folia trouve le nom et le prix automatiquement.</div>'
+        +identHint+'</div>'
         +'<div class="etf-field"><label>Cible %</label><input type="number" value="'+etf.target+'" min="0" max="100" oninput="setEtfField('+eid+',&quot;target&quot;,this.value)"/></div>'
         +'<div class="etf-field"><label>Parts détenues</label><input type="number" value="'+(etf.shares||'')+'" min="0" step="0.001" placeholder="0" oninput="setEtfField('+eid+',&quot;shares&quot;,this.value)"/></div>'
         +'<div class="etf-field"><label>Prix unitaire (€)</label><input type="number" id="price-'+eid+'" value="'+(etf.avgPrice||'')+'" min="0" step="0.01" placeholder="auto" oninput="setEtfField('+eid+',&quot;avgPrice&quot;,this.value)"/></div>';
@@ -1572,6 +1609,9 @@ function applyFetchResult(etf,i,info,manual){
   etf.avgPrice=info.price;
   etf._lastUpdated=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   if(info.name&&!etf._nameLocked)etf.name=info.name;
+  // Rafraîchir le champ nom à l'écran (sinon il reste vide après résolution auto)
+  const card=document.getElementById('etf-card-'+etf.id);
+  if(card){const ni=card.querySelector('.etf-name-input');if(ni&&etf.name&&ni.value!==etf.name)ni.value=etf.name;}
   const pi=document.getElementById('price-'+etf.id);if(pi)pi.value=info.price.toFixed(2);
   const ui=document.getElementById('updated-'+etf.id);if(ui)ui.textContent=etf._lastUpdated;
   refreshFooterPrice(etf.id);
@@ -1611,6 +1651,17 @@ function startAutoRefresh(){
     });
   }
 }
+// Résolution automatique quand l'utilisateur vient de saisir un ISIN valide.
+// Ne se déclenche que pour un ISIN (pas un ticker partiel) afin d'éviter des
+// appels inutiles, et récupère nom + prix pour confirmer que l'ETF est trouvé.
+async function autoResolveEtf(i){
+  const etf=state.etfs[i];if(!etf)return;
+  // Seulement si on a un ISIN valide et pas encore de prix récupéré
+  if(!etf.isin||!isISIN(etf.isin))return;
+  if(etf.avgPrice>0&&etf.name)return; // déjà résolu / renseigné
+  await resolveSingle(i);
+}
+window.autoResolveEtf=autoResolveEtf;
 async function resolveSingle(i){
   const etf=state.etfs[i];if(!etf)return;
   const eid=etf.id;
@@ -1759,7 +1810,16 @@ function confirmPosCheck(){
 }
 async function calculate(){
   const total=state.etfs.reduce((s,e)=>s+(+e.target||0),0);
-  if(total!==100){alert('La somme des allocations doit être 100%.');return;}
+  // Tolérance de 0,5 % pour les arrondis. Sinon, message clair + possibilité de continuer.
+  if(Math.abs(total-100)>0.5){
+    const diff=total-100;
+    const msg=total===0
+      ?'Tu n\'as pas encore défini d\'allocations cibles. Indique le pourcentage souhaité pour chaque ETF (la somme doit faire 100 %).'
+      :'La somme de tes allocations cibles fait <strong>'+total.toFixed(1)+' %</strong> au lieu de 100 % ('
+        +(diff>0?'+':'')+diff.toFixed(1)+' %).<br><br>Pour une répartition cohérente, ajuste tes cibles pour atteindre 100 %. Tu peux quand même calculer, mais le plan visera une cible incohérente.';
+    const proceed=await confirmModal(msg,{okText:'Calculer quand même',cancelText:'Corriger mes cibles',danger:false,html:true});
+    if(!proceed){nav('portfolio');return;}
+  }
   // Vérification des positions au changement de mois (sauf si on revient du modal)
   if(!_posCheckDone&&shouldCheckPositions()){
     openPosCheck();
@@ -2371,6 +2431,14 @@ function detectIndex(name){const n=(name||'').toLowerCase();for(const kw of INDE
 function groupByIndex(etfs){const groups={};etfs.forEach(etf=>{const idx=detectIndex(etf.name);if(!groups[idx])groups[idx]={indexName:idx,etfs:[]};groups[idx].etfs.push(etf);});return Object.values(groups).map(g=>({...g,etfs:g.etfs.sort((a,b)=>b.shares-a.shares)})).sort((a,b)=>b.etfs[0].shares-a.etfs[0].shares);}
 function openImportModal(){document.getElementById('import-modal').style.display='flex';}
 function closeImportModal(){document.getElementById('import-modal').style.display='none';document.getElementById('import-preview').innerHTML='';}
+// Depuis le modal d'import : bascule vers la saisie manuelle (page portefeuille + bibliothèque)
+function goToManualEntry(){
+  closeImportModal();
+  nav('portfolio');
+  // ouvrir la bibliothèque d'ajout d'ETF après la transition d'onglet
+  setTimeout(()=>{if(typeof openEtfLibrary==='function')openEtfLibrary();},120);
+}
+window.goToManualEntry=goToManualEntry;
 const importZone=document.getElementById('import-zone');
 // Wire file input via addEventListener — inline onchange ne fonctionne pas dans DOMContentLoaded scope
 document.getElementById('csv-file').addEventListener('change',function(){if(this.files[0])handleCsvFile(this.files[0]);});
@@ -2671,10 +2739,16 @@ function updateProj(){
     for(let i=0;i<=n;i++){const lbl=i===0?'Auj.':(i%12===0?'A'+i/12:null);if(lbl!==null){labels.push(lbl);const inv=curVal+monthly*i;const v=curVal*Math.pow(1+r,i)+monthly*(Math.pow(1+r,i)-1)/r;const vO=curVal*Math.pow(1+r*1.5,i)+monthly*(Math.pow(1+r*1.5,i)-1)/(r*1.5);const vP=curVal*Math.pow(1+r*0.5,i)+monthly*(Math.pow(1+r*0.5,i)-1)/(r*0.5);base.push(Math.round(v));opt.push(Math.round(vO));pess.push(Math.round(vP));invested.push(Math.round(inv));}}
   }
   const fv=base[base.length-1],fi=invested[invested.length-1];
+  // Valeur nette après fiscalité PEA, selon l'horizon : ≥5 ans → seuls les
+  // prélèvements sociaux (18,6%) s'appliquent sur la plus-value ; <5 ans → PFU 31,4%.
+  const _pv=Math.max(0,fv-fi);
+  const _netRate=years>=5?0.186:0.314;
+  const _net=fv-_pv*_netRate;
+  const _netLabel=years>=5?'net après PEA (PS 18,6%)':'net après PEA (PFU 31,4%)';
   const modeLabel=usingSim
     ?'<span style="font-size:10px;font-family:var(--mono);color:var(--green);">● simulation détaillée par ETF</span>'
     :'<span style="font-size:10px;font-family:var(--mono);color:var(--text3);">● estimation globale (ajoute des ETF avec prix pour affiner)</span>';
-  document.getElementById('proj-metrics').innerHTML='<div style="grid-column:1/-1;margin-bottom:6px;">'+modeLabel+'</div><div class="metric"><div class="metric-label">valeur finale</div><div class="metric-value blue">'+fv.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">total investi</div><div class="metric-value">'+fi.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">plus-value</div><div class="metric-value green">+'+(fv-fi).toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">multiplicateur</div><div class="metric-value purple">×'+(fv/Math.max(fi,1)).toFixed(1)+'</div></div>';
+  document.getElementById('proj-metrics').innerHTML='<div style="grid-column:1/-1;margin-bottom:6px;">'+modeLabel+'</div><div class="metric"><div class="metric-label">valeur finale</div><div class="metric-value blue">'+fv.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">total investi</div><div class="metric-value">'+fi.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">plus-value</div><div class="metric-value green">+'+(fv-fi).toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">multiplicateur</div><div class="metric-value purple">×'+(fv/Math.max(fi,1)).toFixed(1)+'</div></div><div class="metric"><div class="metric-label">'+_netLabel+'</div><div class="metric-value" style="color:'+(years>=5?'var(--green)':'var(--amber)')+';">'+Math.round(_net).toLocaleString('fr-FR')+' €</div></div>';
   const ctx=document.getElementById('chart-proj');
   // Mémoriser quelles courbes l'utilisateur avait masquées (cliquées dans la légende)
   // pour les restaurer après recréation du graphique (sinon elles réapparaissent).
@@ -2839,10 +2913,230 @@ window.openSettings=openSettings;window.closeSettings=closeSettings;window.reset
 window.closePosCheck=closePosCheck;window.confirmPosCheck=confirmPosCheck;
 window.exportData=exportData;window.importData=importData;
 window.confirmOrders=confirmOrders;window.skipConfirm=skipConfirm;
+// ════════════════════════════════════════════════════════════════
+// TUTORIEL GUIDÉ (product tour) — option A : guidé mais non bloquant.
+// Met en évidence un élément à la fois (spotlight + bulle), assombrit le reste,
+// gère les changements d'onglet automatiquement, et avance soit au clic "Suivant",
+// soit automatiquement quand une condition est remplie (ex. un ETF a été ajouté).
+// ════════════════════════════════════════════════════════════════
+// Libellés lisibles des onglets, pour indiquer où le tuto navigue
+const TAB_LABELS={monthly:'Ce mois-ci',portfolio:'Mon portefeuille',history:'Historique',projection:'Projection'};
+// Le parcours principal. Certaines étapes sont "centered" (bulle au centre, sans
+// spotlight) pour l'intro et la conclusion. La branche CSV est gérée à part.
+const TOUR_STEPS=[
+  {
+    centered:true,
+    title:'Bienvenue sur Folia ✨',
+    text:'Folia est ton planificateur d\'investissement DCA pour PEA : tu fixes ta répartition cible, et chaque mois Folia te dit exactement quoi acheter pour t\'en rapprocher — sans jamais vendre.<br><br>Comment veux-tu ajouter tes ETF pour commencer ?',
+    choices:[
+      {label:'Les saisir moi-même',action:'manual'},
+      {label:'📥 Importer un CSV',action:'csv'}
+    ]
+  },
+  {
+    branch:'manual',
+    el:()=>document.querySelector('.btn-add'),
+    tab:'portfolio',
+    title:'Ajoute ton premier ETF',
+    text:'Clique sur « + Ajouter un ETF ». Un bloc vide apparaît, prêt à être renseigné.',
+    advanceWhen:()=>state.etfs.length>0,
+    waitText:'En attente : ajoute un ETF pour continuer…'
+  },
+  {
+    branch:'manual',
+    el:()=>document.getElementById('ident-'+(state.etfs[state.etfs.length-1]?.id)),
+    tab:'portfolio',
+    title:'Saisis l\'ISIN',
+    text:'Tape l\'ISIN de ton ETF (12 caractères, ex. <strong>LU0996182563</strong>), puis clique ailleurs. Folia récupère automatiquement son nom et son prix — tu vois tout de suite que ça a marché !',
+    advanceWhen:()=>{const last=state.etfs[state.etfs.length-1];return last&&last.avgPrice>0;},
+    waitText:'En attente : saisis un ISIN valide pour voir la magie opérer…'
+  },
+  {
+    branch:'manual',
+    el:()=>{const last=state.etfs[state.etfs.length-1];return document.querySelector('#etf-card-'+(last?.id)+' .etf-field input[type=number]');},
+    tab:'portfolio',
+    title:'Définis ta cible',
+    text:'Indique le pourcentage que cet ETF doit représenter dans ton portefeuille idéal. <strong>La somme de tous tes ETF doit faire 100 %.</strong> Tu peux ajouter d\'autres ETF avec « + Ajouter un ETF » et répartir entre eux.',
+    next:true
+  },
+  {
+    branch:'csv',
+    openFirst:()=>{if(typeof openImportModal==='function')openImportModal();},
+    el:()=>document.querySelector('#import-modal .modal'),
+    tab:'portfolio',
+    title:'Importe ton CSV',
+    text:'Dépose ici le fichier exporté depuis ton courtier. Folia y lit tes ETF et tes parts automatiquement. Le tuto reprend dès que tes ETF sont importés.',
+    advanceWhen:()=>state.etfs.length>0,
+    waitText:'En attente : importe ton CSV pour continuer…',
+    onLeave:()=>{if(typeof closeImportModal==='function')closeImportModal();}
+  },
+  {
+    common:true,
+    el:()=>document.getElementById('monthly'),
+    tab:'portfolio',
+    title:'Ton épargne mensuelle',
+    text:'Indique combien tu veux investir chaque mois. Folia répartira ce montant entre tes ETF pour viser ta cible.',
+    next:true
+  },
+  {
+    common:true,
+    el:()=>document.getElementById('btn-calc'),
+    tab:'monthly',
+    title:'Calcule ton plan',
+    text:'C\'est ici que tout se joue : Folia te dit exactement quoi acheter ce mois-ci pour te rapprocher de ta cible. Clique sur « Calculer le plan ».',
+    next:true
+  },
+  {
+    centered:true,
+    title:'À toi de jouer ! 🎉',
+    text:'Tu connais l\'essentiel. Folia a d\'autres choses à découvrir quand tu veux : l\'onglet <strong>Projection</strong> pour visualiser ton capital futur et la fiscalité, l\'<strong>Historique</strong> de tes achats, et plein de réglages. Explore à ton rythme — tout est réversible.',
+    next:true,
+    last:true
+  }
+];
+let _tourIdx=-1,_tourPoll=null,_tourBranch=null;
+function tourActive(){return _tourIdx>=0;}
+// Renvoie la liste des étapes valides pour la branche choisie (manual/csv) :
+// on garde les étapes sans branche (intro, common, fin) + celles de la branche active.
+function tourVisibleSteps(){
+  return TOUR_STEPS.filter(s=>!s.branch||s.branch===_tourBranch);
+}
+function startTour(){
+  _tourBranch=null;_tourIdx=0;
+  if(!document.getElementById('tour-overlay')){
+    const ov=document.createElement('div');ov.id='tour-overlay';
+    ov.innerHTML='<svg><defs><mask id="tour-hole"><rect width="100%" height="100%" fill="white"/><rect id="tour-hole-rect" rx="8" fill="black"/></mask></defs><rect class="tour-mask-bg" width="100%" height="100%" mask="url(#tour-hole)"/></svg>';
+    document.body.appendChild(ov);
+  }
+  showTourStep();
+}
+function endTour(skipped){
+  // appeler onLeave de l'étape courante si besoin (ex. fermer le modal CSV)
+  const steps=tourVisibleSteps();const cur=steps[_tourIdx];
+  if(cur&&cur.onLeave)try{cur.onLeave();}catch(e){}
+  _tourIdx=-1;_tourBranch=null;
+  if(_tourPoll){clearInterval(_tourPoll);_tourPoll=null;}
+  document.getElementById('tour-overlay')?.remove();
+  document.querySelector('.tour-highlight')?.remove();
+  document.querySelector('.tour-bubble')?.remove();
+  try{state._tourDone=true;save();}catch(e){}
+}
+window.startTour=startTour;window.endTour=endTour;
+// Avance à l'étape suivante (en gérant onLeave de l'étape quittée)
+function tourNext(){
+  const steps=tourVisibleSteps();const cur=steps[_tourIdx];
+  if(cur&&cur.onLeave)try{cur.onLeave();}catch(e){}
+  _tourIdx++;showTourStep();
+}
+// Choix dans l'intro : fixe la branche puis avance
+function tourChoose(action){
+  _tourBranch=action;
+  _tourIdx++;showTourStep();
+}
+window.tourChoose=tourChoose;
+function positionTour(el){
+  const ov=document.getElementById('tour-overlay');if(ov)ov.classList.remove('blocking'); // laisser cliquer la cible mise en avant
+  const r=el.getBoundingClientRect();
+  const pad=6;
+  const hole=document.getElementById('tour-hole-rect');
+  if(hole){hole.setAttribute('x',r.left-pad);hole.setAttribute('y',r.top-pad);hole.setAttribute('width',r.width+pad*2);hole.setAttribute('height',r.height+pad*2);}
+  let hl=document.querySelector('.tour-highlight');
+  if(!hl){hl=document.createElement('div');hl.className='tour-highlight';document.body.appendChild(hl);}
+  hl.style.display='block';
+  hl.style.left=(r.left-pad)+'px';hl.style.top=(r.top-pad)+'px';hl.style.width=(r.width+pad*2)+'px';hl.style.height=(r.height+pad*2)+'px';
+  const bubble=document.querySelector('.tour-bubble');
+  if(bubble){
+    const bw=300,bh=bubble.offsetHeight||150;
+    let top=r.bottom+14,left=r.left;
+    if(top+bh>window.innerHeight-10)top=Math.max(10,r.top-bh-14);
+    if(left+bw>window.innerWidth-10)left=Math.max(10,window.innerWidth-bw-10);
+    bubble.style.top=top+'px';bubble.style.left=left+'px';
+  }
+}
+// Place la bulle au centre de l'écran (étapes intro/fin, sans spotlight)
+function centerBubble(){
+  const ov=document.getElementById('tour-overlay');if(ov)ov.classList.add('blocking'); // bloquer l'arrière-plan
+  const hole=document.getElementById('tour-hole-rect');
+  if(hole){hole.setAttribute('width',0);hole.setAttribute('height',0);} // pas de trou
+  const hl=document.querySelector('.tour-highlight');if(hl)hl.style.display='none';
+  const bubble=document.querySelector('.tour-bubble');
+  if(bubble){
+    bubble.style.top=Math.max(20,(window.innerHeight-bubble.offsetHeight)/2)+'px';
+    bubble.style.left=Math.max(10,(window.innerWidth-bubble.offsetWidth)/2)+'px';
+  }
+}
+function showTourStep(){
+  const steps=tourVisibleSteps();
+  const step=steps[_tourIdx];
+  if(!step){endTour(false);return;}
+  // Changement d'onglet si nécessaire
+  if(step.tab){
+    const pageActive=document.getElementById('page-'+step.tab)?.classList.contains('active');
+    if(!pageActive)nav(step.tab);
+  }
+  // Action d'ouverture éventuelle (ex. ouvrir le modal CSV) — après la bascule d'onglet
+  if(step.openFirst)setTimeout(()=>{try{step.openFirst();}catch(e){}},step.tab?280:60);
+  const delay=(step.tab?280:60)+(step.openFirst?160:0);
+  setTimeout(()=>{
+    // Construire / réutiliser la bulle
+    let bubble=document.querySelector('.tour-bubble');
+    if(!bubble){bubble=document.createElement('div');bubble.className='tour-bubble';document.body.appendChild(bubble);}
+    const total=steps.length;
+    const tabLine=step.tab&&!step.centered
+      ?'<div class="tour-step-count" style="color:var(--text3);margin-top:3px;">📍 Onglet : '+(TAB_LABELS[step.tab]||step.tab)+'</div>':'';
+    // Actions selon le type d'étape
+    let actions='';
+    if(step.choices){
+      actions=step.choices.map((c,i)=>'<button class="tour-next" data-choice="'+c.action+'"'+(i>0?' style="background:transparent;border:1px solid var(--border2);color:var(--text2);"':'')+'>'+c.label+'</button>').join('');
+    } else if(step.next){
+      actions='<button class="tour-next">'+(step.last?'Terminer ✓':'Suivant →')+'</button>';
+    } else if(step.advanceWhen){
+      // En attente d'une action auto-détectée, mais on offre toujours une porte de
+      // sortie manuelle (en cas d'échec de résolution, erreur réseau, faute de frappe…).
+      actions='<span class="tour-wait">'+(step.waitText||'En attente de ton action…')+'</span>'
+        +'<button class="tour-next" style="background:transparent;border:1px solid var(--border2);color:var(--text2);">Continuer quand même →</button>';
+    }
+    bubble.innerHTML='<div class="tour-step-count">Étape '+(_tourIdx+1)+' / '+total+'</div>'
+      +tabLine
+      +'<div class="tour-title">'+step.title+'</div>'
+      +'<div class="tour-text">'+step.text+'</div>'
+      +'<div class="tour-actions" style="'+(step.choices?'flex-wrap:wrap;':'')+'">'+actions+'<button class="tour-skip">Passer le tuto</button></div>';
+    bubble.querySelector('.tour-skip').onclick=()=>endTour(true);
+    // Boutons de choix (intro)
+    bubble.querySelectorAll('.tour-next[data-choice]').forEach(b=>{
+      b.onclick=()=>tourChoose(b.getAttribute('data-choice'));
+    });
+    // Bouton suivant simple
+    const nextBtn=bubble.querySelector('.tour-next:not([data-choice])');
+    if(nextBtn)nextBtn.onclick=()=>{if(step.last)endTour(false);else tourNext();};
+
+    if(step.centered){
+      setTimeout(centerBubble,30);
+    } else {
+      const el=typeof step.el==='function'?step.el():step.el;
+      if(!el){tourNext();return;}
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      setTimeout(()=>positionTour(el),80);
+      const reposition=()=>{const e2=typeof step.el==='function'?step.el():step.el;if(e2&&tourActive())positionTour(e2);};
+      window.addEventListener('scroll',reposition,{passive:true});
+      window.addEventListener('resize',reposition);
+    }
+    // Avancement automatique si condition remplie
+    if(_tourPoll){clearInterval(_tourPoll);_tourPoll=null;}
+    if(step.advanceWhen){
+      _tourPoll=setInterval(()=>{if(step.advanceWhen()){clearInterval(_tourPoll);_tourPoll=null;tourNext();}},500);
+    }
+  },delay);
+}
 renderEtfGrid();
 renderMonthly();
 startAutoRefresh();
 refreshUndoBtn();
+// Lancement automatique de la visite guidée au tout premier usage
+// (portefeuille vide ET tuto jamais terminé/passé).
+if(!state._tourDone && (!state.etfs || state.etfs.length===0)){
+  setTimeout(()=>{ if(typeof startTour==='function' && (!state.etfs||state.etfs.length===0)) startTour(); }, 1400);
+}
 
 }); // DOMContentLoaded
 </script>
