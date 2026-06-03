@@ -227,3 +227,87 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 .history-calculated{font-size:10px;font-family:var(--mono);padding:2px 6px;border-radius:3px;background:rgba(251,191,36,.1);color:var(--amber);border:1px solid rgba(251,191,36,.2);}
 .history-item{border-bottom:1px solid var(--border);padding:13px 0;}.history-item:last-child{border-bottom:none;}
 footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margin-top:2rem;font-size:11px;font-family:var(--mono);color:var(--text3);}
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE — adaptation tablette & mobile.
+   On ne surcharge QUE sous les seuils ; le desktop reste inchangé.
+   Paliers : ≤900px (tablette) puis ≤640px (mobile).
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Tablette / petit écran (≤900px) ───────────────────────────── */
+@media(max-width:900px){
+  /* La colonne de réglages passe au-dessus de la grille d'ETF, sans sticky. */
+  .portfolio-layout{grid-template-columns:1fr;}
+  .portfolio-left{position:static;top:auto;}
+  /* Un peu moins de marge sur les pages pour gagner de la largeur. */
+  .page{padding:1.25rem 1.25rem;}
+  .health-bar{gap:1.1rem;}
+}
+
+/* ── Mobile (≤640px) ───────────────────────────────────────────── */
+@media(max-width:640px){
+  /* — Barre de navigation : logo + paramètres en haut sur une ligne,
+       onglets en dessous sur toute la largeur (scrollables si besoin) — */
+  .nav{flex-wrap:wrap;height:auto;padding:.5rem .75rem;gap:.5rem .5rem;}
+  .nav-logo{order:1;}
+  .nav>div:last-child{order:2;margin-left:auto;}
+  .nav-tabs{order:3;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;justify-content:flex-start;}
+  .nav-tab{padding:8px 14px;white-space:nowrap;flex-shrink:0;}
+  /* Cache la barre de scroll horizontale des onglets (visuel plus propre). */
+  .nav-tabs::-webkit-scrollbar{display:none;}
+  .nav-tabs{scrollbar-width:none;}
+
+  /* — Barre santé : items répartis, espacement réduit — */
+  .health-bar{gap:.75rem 1.25rem;padding:.6rem .75rem;}
+  .health-value{font-size:14px;}
+  .reminder-banner{margin-left:0;width:100%;justify-content:center;}
+
+  /* — Pages : padding minimal pour exploiter toute la largeur — */
+  .page{padding:.85rem .75rem;}
+  .card,.plan-card,.update-card,.onboarding{padding:1rem 1rem;}
+
+  /* — Mise en page principale : tout en une colonne — */
+  .flow-layout{grid-template-columns:1fr;gap:1rem;}
+  .portfolio-layout{grid-template-columns:1fr;}
+  .portfolio-left{position:static;top:auto;}
+
+  /* — Grille d'ETF : une seule colonne (le minmax fixe débordait) — */
+  .etf-grid{grid-template-columns:1fr;}
+
+  /* — Camembert un peu plus compact — */
+  .pie-canvas-wrap{width:140px;height:140px;}
+
+  /* — Champs et boutons : cibles tactiles plus grandes (≥40px) — */
+  input,select{font-size:16px;} /* 16px évite le zoom auto iOS au focus */
+  .form-group input,.form-group select{height:42px;font-size:16px;}
+  .etf-field input{height:38px;font-size:14px;}
+  .etf-name-input{height:38px;font-size:14px;}
+  .btn-sm{height:38px;}
+  .btn-primary,.btn-ghost,.btn-calc,.btn-confirm,.btn-save-parts{padding:11px 16px;font-size:13px;}
+  .day-cell{padding:9px 0;font-size:13px;} /* sélecteur de jour plus tapable */
+
+  /* — Métriques de projection : 2 par ligne max — */
+  .metrics-row{grid-template-columns:1fr 1fr;}
+  .metric-value{font-size:17px;}
+
+  /* — Contrôles de projection : pleine largeur — */
+  .proj-controls{gap:10px;}
+  .proj-controls input[type=range]{width:100%;}
+
+  /* — Graphiques un peu plus bas pour rester lisibles — */
+  .chart-wrap{height:220px;}
+
+  /* — Modales : occupent presque tout l'écran — */
+  .modal{padding:1.1rem;width:96vw;max-height:88vh;}
+
+  /* — Bulles du tutoriel : plus étroites ; le JS les place en bas sur mobile — */
+  .tour-bubble{max-width:94vw;}
+}
+
+/* ── Très petit mobile (≤380px) : derniers ajustements ─────────── */
+@media(max-width:380px){
+  .nav-logo{font-size:14px;}
+  .health-bar{gap:.6rem 1rem;}
+  .metrics-row{grid-template-columns:1fr;}
+  .page{padding:.75rem .6rem;}
+}

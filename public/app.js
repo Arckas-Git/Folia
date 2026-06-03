@@ -2684,7 +2684,22 @@ function positionTour(el){
   hl.style.left=(r.left-pad)+'px';hl.style.top=(r.top-pad)+'px';hl.style.width=(r.width+pad*2)+'px';hl.style.height=(r.height+pad*2)+'px';
   const bubble=document.querySelector('.tour-bubble');
   if(bubble){
+    // — Mobile (écran étroit) : la bulle se cale en bas, pleine largeur, quel
+    //   que soit le mode demandé. Le spotlight reste visible au-dessus. C'est
+    //   plus lisible que d'essayer de la coller à gauche/au-dessus d'une cible
+    //   sur un petit écran. —
+    if(window.innerWidth<=640){
+      const m=Math.round(window.innerWidth*0.03); // marge ~3vw
+      bubble.style.left=m+'px';
+      bubble.style.right=m+'px';
+      bubble.style.width='auto';
+      const bhm=bubble.offsetHeight||160;
+      bubble.style.top=Math.max(8,window.innerHeight-bhm-12)+'px';
+      return;
+    }
     const bw=300,bh=bubble.offsetHeight||150;
+    // Réinitialise d'éventuels résidus du mode mobile (right/width).
+    bubble.style.right='';bubble.style.width='';
     // Position à gauche du spotlight : on place la bulle dans l'espace à gauche de
     // la zone éclairée (utile quand le spotlight est large, comme la grille d'ETF).
     // Si pas assez de place à gauche, on la met au-dessus du spotlight.
@@ -2724,6 +2739,15 @@ function centerBubble(){
   const hl=document.querySelector('.tour-highlight');if(hl)hl.style.display='none';
   const bubble=document.querySelector('.tour-bubble');
   if(bubble){
+    if(window.innerWidth<=640){
+      // Mobile : bulle pleine largeur, centrée verticalement.
+      const m=Math.round(window.innerWidth*0.03);
+      bubble.style.left=m+'px';bubble.style.right=m+'px';bubble.style.width='auto';
+      bubble.style.top=Math.max(20,(window.innerHeight-bubble.offsetHeight)/2)+'px';
+      return;
+    }
+    // Desktop : on réinitialise right/width au cas où on vient du mode mobile.
+    bubble.style.right='';bubble.style.width='';
     bubble.style.top=Math.max(20,(window.innerHeight-bubble.offsetHeight)/2)+'px';
     bubble.style.left=Math.max(10,(window.innerWidth-bubble.offsetWidth)/2)+'px';
   }
