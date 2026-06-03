@@ -1,0 +1,19 @@
+# Configuration du Worker Folia (Cloudflare).
+# Ce fichier indique à Cloudflare comment déployer le site + l'API de prix.
+
+# Nom du projet → c'est lui qui forme la 1re partie de l'adresse :
+#   folia.<ton-sous-domaine>.workers.dev
+# Mets ici un nom neutre (sans ton nom/prénom).
+name = "folia"
+
+# Le script principal du Worker (gère /api/price et sert les fichiers).
+main = "src/index.js"
+
+# Date de compatibilité (fige le comportement du runtime). Ne pas y toucher.
+compatibility_date = "2026-06-03"
+
+# Fichiers statiques du site (HTML, CSS, JS) servis automatiquement.
+# "binding = ASSETS" permet au Worker de déléguer à ces fichiers.
+[assets]
+directory = "./public"
+binding = "ASSETS"
