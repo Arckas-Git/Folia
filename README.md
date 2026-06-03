@@ -1,2 +1,0 @@
-# Folia
-Planificateur DCA-PEA
