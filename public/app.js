@@ -702,7 +702,10 @@ function setSubField(eid,si,field,val){
 async function resolveSubEtf(eid,si){
   const etf=state.etfs.find(e=>e.id===eid);if(!etf||!etf.subs||!etf.subs[si])return;
   const sub=etf.subs[si];
-  const btn=document.querySelector('#sub-jef-'+eid+'-'+si)?.previousElementSibling;
+  // Le bouton de refresh individuel n'existe plus (un seul bouton par groupe) ;
+  // on ne manipule un bouton que si on en trouve un vrai (compat. ascendante).
+  const cand=document.querySelector('#sub-jef-'+eid+'-'+si)?.previousElementSibling;
+  const btn=(cand&&cand.tagName==='BUTTON')?cand:null;
   if(btn){btn.textContent='…';btn.disabled=true;}
   const info=await fetchByEtf(sub);
   if(btn){btn.textContent='⟳';btn.disabled=false;}
@@ -733,6 +736,26 @@ window.addSubEtf=addSubEtf;
 window.removeSubEtf=removeSubEtf;
 window.setSubField=setSubField;
 window.resolveSubEtf=resolveSubEtf;
+// Récupère les prix de TOUS les émetteurs d'un groupe en une fois (un seul bouton).
+async function resolveGroup(eid){
+  const etf=state.etfs.find(e=>e.id===eid);
+  if(!etf||!etf.subs||!etf.subs.length)return;
+  // Retrouver le bouton "Prix du groupe" pour donner un retour visuel
+  const btn=document.querySelector('button[onclick="resolveGroup('+eid+')"]');
+  const label=btn?btn.textContent:null;
+  if(btn){btn.textContent='⟳ …';btn.disabled=true;}
+  // Résoudre chaque émetteur qui a un identifiant (ISIN ou ticker)
+  for(let si=0;si<etf.subs.length;si++){
+    const sub=etf.subs[si];
+    if(sub.isin||sub.ticker){
+      try{await resolveSubEtf(eid,si);}catch(e){}
+    }
+  }
+  if(btn){btn.textContent='✓ Prix à jour';btn.style.color='var(--green)';
+    setTimeout(()=>{btn.textContent=label||'⟳ Prix du groupe';btn.style.color='';btn.disabled=false;},2000);}
+  renderAllocOverview();renderPieChart();updateHealthBar();renderMonthly();
+}
+window.resolveGroup=resolveGroup;
 // Résolution auto d'un sous-ETF (émetteur) quand un ISIN valide vient d'être saisi.
 async function autoResolveSubEtf(eid,si){
   const etf=state.etfs.find(e=>e.id===eid);if(!etf||!etf.subs||!etf.subs[si])return;
@@ -865,7 +888,6 @@ function renderEtfGrid(){
           // Ligne identifiant
           +'<div class="etf-ticker-row" style="margin-bottom:7px;">'
           +'<input type="text" id="sub-ident-'+eid+'-'+si+'" value="'+subIdentVal+'" placeholder="ISIN ou ticker" oninput="setSubField('+eid+','+si+',\'ident\',this.value)" onchange="autoResolveSubEtf('+eid+','+si+')"/>'
-          +'<button class="btn-sm btn-resolve" onclick="resolveSubEtf('+eid+','+si+')" title="Récupérer prix">⟳</button>'
           +'<a href="'+justEtfLink(sub)+'" target="_blank" class="btn-sm btn-yf" id="sub-jef-'+eid+'-'+si+'">↗</a>'
           +'</div>'
           +(subHint?'<div style="margin-bottom:7px;">'+subHint+'</div>':'')
@@ -880,7 +902,10 @@ function renderEtfGrid(){
           +'<div style="margin-top:6px;text-align:right;font-size:11px;font-family:var(--mono);color:'+(subVal>0?'var(--text2)':'var(--text3)')+';" id="sub-val-'+eid+'-'+si+'">'+(subVal>0?'= '+subVal.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €':'= — €')+'</div>'
           +'</div>';
       });
-      subsBody+='<button onclick="addSubEtf('+eid+')" style="background:transparent;border:1px dashed var(--border2);color:var(--text3);font-size:11px;font-family:var(--mono);padding:6px;border-radius:var(--r);width:100%;cursor:pointer;" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'\';this.style.color=\'var(--text3)\'">+ Ajouter un émetteur</button>';
+      subsBody+='<div style="display:flex;gap:6px;">'
+        +'<button onclick="addSubEtf('+eid+')" style="background:transparent;border:1px dashed var(--border2);color:var(--text3);font-size:11px;font-family:var(--mono);padding:6px;border-radius:var(--r);flex:1;cursor:pointer;" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'\';this.style.color=\'var(--text3)\'">+ Ajouter un émetteur</button>'
+        +'<button onclick="resolveGroup('+eid+')" title="Récupérer les prix de tous les émetteurs" style="background:transparent;border:1px solid var(--border2);color:var(--text2);font-size:11px;font-family:var(--mono);padding:6px 10px;border-radius:var(--r);cursor:pointer;white-space:nowrap;" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border2)\';this.style.color=\'var(--text2)\'">⟳ Prix du groupe</button>'
+        +'</div>';
       subsBody+='</div>';
     }
 
@@ -2056,7 +2081,7 @@ function applyImport(replaceAll){
   else if(anyNew&&anyChanged)msg='Import fusionné : nouveaux ETF ajoutés et parts mises à jour.';
   else if(anyNew)msg='Import fusionné : nouveaux ETF ajoutés.';
   else if(anyChanged)msg='Import fusionné : parts mises à jour.';
-  alert(msg);
+  toast(msg);
   // Actualiser automatiquement les prix juste après l'import, pour que le
   // portefeuille importé soit immédiatement à jour (sans clic manuel).
   const hasIds=state.etfs.some(e=>e.isin||e.ticker||(e.subs&&e.subs.some(s=>s.isin||s.ticker)));
