@@ -259,13 +259,13 @@
       <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="closeSettings();setTimeout(startTour,200)">✨ Revoir la visite guidée</button>
     </div>
     <div>
-      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;">Mes données</div>
-      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.5;margin-bottom:1rem;">Tes données vivent dans ce navigateur. Deux façons de les déplacer ou les protéger : un <strong>transfert rapide</strong> vers un autre appareil (code), ou une <strong>sauvegarde durable</strong> dans un fichier.</div>
+      <div class="info-row" style="margin-bottom:.4rem;"><span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;">Mes données</span><span class="info-ic" onclick="toggleInfo(this)">i</span></div>
+      <div class="info-tip">Tes données vivent dans ce navigateur. Deux façons de les déplacer ou les protéger : un <strong>transfert rapide</strong> vers un autre appareil (code), ou une <strong>sauvegarde durable</strong> dans un fichier.</div>
 
       <!-- Sous-bloc 1 : transfert rapide entre appareils (code) -->
-      <div style="border:1px solid var(--border);border-radius:var(--r2);padding:.9rem 1rem;margin-bottom:.75rem;">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px;">&#128241; Transférer vers un autre appareil</div>
-        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-bottom:11px;">Rapide, sans fichier (ex. mobile → PC). Le code expire après 30 jours et tes données transitent par le serveur.</div>
+      <div style="border:1px solid var(--border);border-radius:var(--r2);padding:.9rem 1rem;margin:.6rem 0 .75rem;">
+        <div class="info-row" style="margin-bottom:9px;"><span style="font-size:12px;font-weight:600;color:var(--text);">&#128241; Transférer vers un autre appareil</span><span class="info-ic" onclick="toggleInfo(this)">i</span></div>
+        <div class="info-tip">Rapide, sans fichier (ex. mobile → PC). Le code expire après 30 jours et tes données transitent par le serveur.</div>
         <button id="sync-save-btn" class="btn-primary" style="width:100%;margin-bottom:9px;" onclick="syncSave()">&#9729; Générer un code</button>
         <div id="sync-code-output" style="margin-bottom:12px;"></div>
         <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:6px;">Reçu un code sur l'autre appareil ? Saisis-le ici :</div>
@@ -278,8 +278,8 @@
 
       <!-- Sous-bloc 2 : sauvegarde durable (fichier) -->
       <div style="border:1px solid var(--border);border-radius:var(--r2);padding:.9rem 1rem;margin-bottom:.75rem;">
-        <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px;">&#128190; Sauvegarde durable (fichier)</div>
-        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-bottom:11px;">Un fichier conservé chez toi, sans expiration ni serveur. Ton filet de sécurité avant un changement d'appareil ou un gros remaniement.</div>
+        <div class="info-row" style="margin-bottom:9px;"><span style="font-size:12px;font-weight:600;color:var(--text);">&#128190; Sauvegarde durable (fichier)</span><span class="info-ic" onclick="toggleInfo(this)">i</span></div>
+        <div class="info-tip">Un fichier conservé chez toi, sans expiration ni serveur. Ton filet de sécurité avant un changement d'appareil ou un gros remaniement.</div>
         <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="exportData()">&#11015; Exporter dans un fichier</button>
         <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="document.getElementById('import-data-file').click()">&#11014; Importer un fichier</button>
         <input type="file" id="import-data-file" accept="application/json,.json" style="display:none;" onchange="importData(this.files[0])"/>
@@ -306,7 +306,7 @@
     <button class="btn-ghost" style="width:100%;" onclick="goToManualEntry()">Ajouter mes ETF manuellement →</button>
   </div>
 </div>
-<footer>Folia · v1.49.1 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.49.2 · Planificateur DCA PEA · Données indicatives</footer>
 <script src="app.js" defer></script>
 </body>
 </html>
