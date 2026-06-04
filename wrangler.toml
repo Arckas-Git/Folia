@@ -17,3 +17,13 @@ compatibility_date = "2026-06-03"
 [assets]
 directory = "./public"
 binding = "ASSETS"
+
+# Espace de stockage KV pour la SYNCHRONISATION PAR CODE (mobile ↔ PC).
+# ⚠ Ces 3 lignes sont VOLONTAIREMENT en commentaire (le # devant) pour que le
+#   déploiement réussisse même sans synchro. Pour ACTIVER la synchro :
+#     1. crée un espace KV dans Cloudflare (voir le guide, section Synchro),
+#     2. retire le # devant les 3 lignes ci-dessous,
+#     3. remplace COLLE_ICI_TON_ID_KV par l'identifiant de ton espace KV.
+# [[kv_namespaces]]
+# binding = "FOLIA_KV"
+# id = "COLLE_ICI_TON_ID_KV"
