@@ -1812,6 +1812,29 @@ function exportData(){
     _dataIoStatus('✓ Sauvegarde téléchargée','var(--green)');
   }catch(e){_dataIoStatus('✕ Échec de l\'export','var(--red)');}
 }
+// Applique un "state" importé (depuis un fichier OU depuis la synchro par code).
+// Remplace les données actuelles, sauvegarde et rafraîchit tout l'affichage.
+// Renvoie true si appliqué, false si le state est invalide.
+function applyImportedState(incoming){
+  if(!incoming||typeof incoming!=='object'||!Array.isArray(incoming.etfs))return false;
+  // Fusionner sur DEFAULT_STATE pour garantir toutes les clés attendues
+  const fresh=JSON.parse(JSON.stringify(DEFAULT_STATE));
+  const merged=Object.assign(fresh,incoming);
+  Object.keys(state).forEach(k=>delete state[k]);
+  Object.assign(state,merged);
+  uiMode=state.uiMode||'simple';
+  save();
+  // Re-render complet
+  document.getElementById('monthly').value=state.monthly;
+  document.getElementById('freq').value=state.freq||'monthly';
+  document.getElementById('fee-per-order').value=state.feePerOrder!=null?state.feePerOrder:1;
+  document.getElementById('reminder-day').value=state.reminderDay||1;
+  document.getElementById('drift-alert').value=state.driftAlert||8;
+  if(typeof renderDayPicker==='function')renderDayPicker();
+  renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();updateProj();
+  startAutoRefresh();
+  return true;
+}
 // Importer une sauvegarde JSON (remplace les données actuelles après confirmation)
 function importData(file){
   if(!file)return;
@@ -1828,28 +1851,80 @@ function importData(file){
     if(!await confirmModal('Importer cette sauvegarde ? Tes données actuelles seront remplacées.',{okText:'Importer'}))return;
     pushUndo('import d\'une sauvegarde');
     try{
-      // Fusionner sur DEFAULT_STATE pour garantir toutes les clés attendues
-      const fresh=JSON.parse(JSON.stringify(DEFAULT_STATE));
-      const merged=Object.assign(fresh,incoming);
-      Object.keys(state).forEach(k=>delete state[k]);
-      Object.assign(state,merged);
-      uiMode=state.uiMode||'simple';
-      save();
-      // Re-render complet
-      document.getElementById('monthly').value=state.monthly;
-      document.getElementById('freq').value=state.freq||'monthly';
-      document.getElementById('fee-per-order').value=state.feePerOrder!=null?state.feePerOrder:1;
-      document.getElementById('reminder-day').value=state.reminderDay||1;
-      document.getElementById('drift-alert').value=state.driftAlert||8;
-      if(typeof renderDayPicker==='function')renderDayPicker();
-      renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();updateProj();
-      startAutoRefresh();
+      applyImportedState(incoming);
       _dataIoStatus('✓ Sauvegarde importée avec succès','var(--green)');
     }catch(err){_dataIoStatus('✕ Échec de l\'import','var(--red)');}
   };
   reader.onerror=()=>_dataIoStatus('✕ Impossible de lire le fichier','var(--red)');
   reader.readAsText(file,'utf-8');
 }
+
+// ── Synchronisation par code (mobile ↔ PC) ───────────────────────
+// Envoie les données au Worker, qui renvoie un code court à reporter sur
+// l'autre appareil. Affiche le code dans la zone prévue de la modale.
+async function syncSave(){
+  const btn=document.getElementById('sync-save-btn');
+  const out=document.getElementById('sync-code-output');
+  if(btn){btn.disabled=true;btn.textContent='Envoi…';}
+  if(out)out.innerHTML='';
+  try{
+    const payload={app:'Folia',type:'folia-backup',version:1,exportedAt:new Date().toISOString(),state:state};
+    const r=await fetch('/api/sync/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(d&&d.code){
+      const exp=d.expiresAt?new Date(d.expiresAt).toLocaleDateString('fr-FR'):'';
+      if(out)out.innerHTML='<div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:6px;">Ton code de récupération :</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;">'
+        +'<span id="sync-code-val" style="font-size:26px;font-weight:700;font-family:var(--mono);letter-spacing:.12em;color:var(--accent);">'+d.code+'</span>'
+        +'<button onclick="copySyncCode()" class="btn-ghost" style="font-size:11px;padding:5px 10px;">Copier</button>'
+        +'</div>'
+        +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:8px;line-height:1.45;">Sur ton autre appareil : ouvre Folia → Paramètres → « Récupérer avec un code » → saisis ce code.'
+        +(exp?'<br>Ce code expire le '+exp+'.':'')+'</div>';
+    } else {
+      if(out)out.innerHTML='<div style="font-size:12px;color:var(--red);font-family:var(--mono);">'+((d&&d.error)||'Échec de l\'envoi')+'</div>';
+    }
+  }catch(e){
+    if(out)out.innerHTML='<div style="font-size:12px;color:var(--red);font-family:var(--mono);">Erreur réseau, réessaie.</div>';
+  }
+  if(btn){btn.disabled=false;btn.textContent='⟳ Générer un nouveau code';}
+}
+function copySyncCode(){
+  const el=document.getElementById('sync-code-val');
+  if(el&&navigator.clipboard){navigator.clipboard.writeText(el.textContent).then(()=>toast('Code copié')).catch(()=>{});}
+}
+// Récupère les données associées à un code et les applique (après confirmation).
+async function syncLoad(){
+  const inp=document.getElementById('sync-code-input');
+  const out=document.getElementById('sync-load-output');
+  const code=(inp?inp.value:'').trim().toUpperCase();
+  if(out)out.innerHTML='';
+  if(code.length<4){if(out)out.innerHTML='<div style="font-size:12px;color:var(--amber);font-family:var(--mono);">Entre un code valide.</div>';return;}
+  const btn=document.getElementById('sync-load-btn');
+  if(btn){btn.disabled=true;btn.textContent='Récupération…';}
+  try{
+    const r=await fetch('/api/sync/load?code='+encodeURIComponent(code));
+    const d=await r.json();
+    if(d&&d.error){
+      if(out)out.innerHTML='<div style="font-size:12px;color:var(--red);font-family:var(--mono);">'+d.error+'</div>';
+    } else {
+      const incoming=(d&&d.type==='folia-backup'&&d.state)?d.state:d;
+      if(!incoming||!Array.isArray(incoming.etfs)){
+        if(out)out.innerHTML='<div style="font-size:12px;color:var(--red);font-family:var(--mono);">Données illisibles pour ce code.</div>';
+      } else {
+        if(await confirmModal('Récupérer ces données ? Tes données actuelles sur cet appareil seront remplacées.',{okText:'Récupérer'})){
+          pushUndo('récupération par code');
+          applyImportedState(incoming);
+          closeSettings();
+          toast('✓ Données récupérées');
+        }
+      }
+    }
+  }catch(e){
+    if(out)out.innerHTML='<div style="font-size:12px;color:var(--red);font-family:var(--mono);">Erreur réseau, réessaie.</div>';
+  }
+  if(btn){btn.disabled=false;btn.textContent='Récupérer';}
+}
+window.syncSave=syncSave;window.syncLoad=syncLoad;window.copySyncCode=copySyncCode;
 async function resetAllData(){
   if(!await confirmModal('Réinitialiser toutes les données ? Cette action est irréversible (sauf annulation immédiate par Ctrl+Z).',{okText:'Réinitialiser',danger:true}))return;
   pushUndo('réinitialisation');

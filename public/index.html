@@ -259,6 +259,18 @@
       <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="closeSettings();setTimeout(startTour,200)">✨ Revoir la visite guidée</button>
     </div>
     <div>
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Synchronisation entre appareils</div>
+      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-bottom:11px;">Transfère tes données d'un appareil à un autre (ex. mobile → PC) avec un code court, sans fichier. ⚠ Tes données transitent alors par le serveur (chiffré en transit). Le code expire après 30 jours.</div>
+      <button id="sync-save-btn" class="btn-primary" style="width:100%;margin-bottom:9px;" onclick="syncSave()">&#9729; Générer un code (envoyer mes données)</button>
+      <div id="sync-code-output" style="margin-bottom:14px;"></div>
+      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:6px;">Récupérer avec un code :</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <input type="text" id="sync-code-input" placeholder="ABC123" maxlength="8" style="flex:1;text-transform:uppercase;letter-spacing:.1em;font-size:15px;text-align:center;" oninput="this.value=this.value.toUpperCase()"/>
+        <button id="sync-load-btn" class="btn-ghost" onclick="syncLoad()">Récupérer</button>
+      </div>
+      <div id="sync-load-output" style="min-height:14px;"></div>
+    </div>
+    <div>
       <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;">Données</div>
       <div style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-bottom:9px;">Tes données sont enregistrées dans ce navigateur. Exporte une sauvegarde pour les conserver ailleurs ou les transférer sur un autre appareil.</div>
       <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="exportData()">&#11015; Exporter mes données (sauvegarde)</button>
@@ -284,7 +296,7 @@
     <button class="btn-ghost" style="width:100%;" onclick="goToManualEntry()">Ajouter mes ETF manuellement →</button>
   </div>
 </div>
-<footer>Folia · v1.48.0 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.49.0 · Planificateur DCA PEA · Données indicatives</footer>
 <script src="app.js" defer></script>
 </body>
 </html>
