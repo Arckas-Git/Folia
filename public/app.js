@@ -55,7 +55,7 @@ function load(){try{const d=localStorage.getItem('folia_v3');return d?JSON.parse
 
 const DEFAULT_STATE={
   etfs:[],
-  monthly:500,freq:'monthly',maxDefer:3,expectedReturn:8,
+  monthly:500,freq:'monthly',maxDefer:3,expectedReturn:8,expectedInflation:3,
   feePerOrder:1,        // frais par ordre ponctuel (€) — dépend du courtier
   reminderDay:1,        // jour du mois pour le rappel de versement
   driftAlert:8,         // seuil d'écart à la cible (%) qui passe le bandeau en alerte
@@ -65,10 +65,13 @@ const DEFAULT_STATE={
   _deferCounters:{}, // {etfId: nb de mois consécutifs où l'ETF a été reporté}
   _archivedEtfs:[], // ETF supprimés, conservés pour récupération via la bibliothèque
   _tourDone:false, // visite guidée déjà vue/passée ?
-  _obDismissed:false // bannière de bienvenue fermée manuellement ?
+  _obDismissed:false, // bannière de bienvenue fermée manuellement ?
+  _seenChangelog:null // version du dernier "Quoi de neuf" déjà vu par l'utilisateur
 };
 
-let state=load()||JSON.parse(JSON.stringify(DEFAULT_STATE));
+const _loadedRaw=load();
+const _isNewUser=(_loadedRaw===null); // aucune donnée existante = tout premier passage
+let state=_loadedRaw||JSON.parse(JSON.stringify(DEFAULT_STATE));
 let uiMode='simple';
 function save(){try{state.uiMode=uiMode;localStorage.setItem('folia_v3',JSON.stringify(state));}catch(e){}}
 
@@ -244,6 +247,96 @@ function toggleInfo(ic){
   ic.classList.toggle('open',open);
 }
 window.toggleInfo=toggleInfo;
+
+// ════════════════════════════════════════════════════════════════
+// "QUOI DE NEUF" — petit pop-up des nouveautés pour les utilisateurs
+// qui reviennent après une mise à jour.
+//
+// COMMENT AJOUTER UNE NOUVEAUTÉ (à faire quand tu veux l'annoncer) :
+//   Ajoute une entrée EN HAUT du tableau CHANGELOG ci-dessous, avec :
+//     v     : le numéro de version (doit correspondre au footer)
+//     d     : la date (texte libre, ex. 'juin 2026')
+//     items : la liste des changements (phrases courtes)
+//   Tu n'es PAS obligé d'ajouter une entrée à chaque push : seules les
+//   versions listées ici déclenchent un pop-up. Les petits correctifs que
+//   tu ne veux pas annoncer, tu peux simplement ne pas les lister.
+//
+// COMPORTEMENT :
+//   • Nouveau visiteur : ne voit jamais l'historique (il découvre le site).
+//   • Visiteur qui revient : voit UN seul pop-up regroupant tout ce qui est
+//     plus récent que ce qu'il a déjà vu (jamais 10 pop-up à la suite).
+// ════════════════════════════════════════════════════════════════
+const CHANGELOG=[
+  {v:'1.51.0',d:'juin 2026',items:[
+    'Projection : nouveau curseur « Inflation » (3% par défaut). En plus de la valeur brute, la projection affiche désormais la « valeur réelle nette » — ce que ton capital vaudra vraiment en argent d\'aujourd\'hui, une fois l\'impôt PEA et l\'inflation pris en compte — avec sa courbe sur le graphique.'
+  ]},
+  {v:'1.50.0',d:'juin 2026',items:[
+    '✨ Cette fenêtre « Quoi de neuf » : tu verras les nouveautés à chaque retour sur le site.',
+    'Synchronisation entre appareils : transfère tes données mobile ↔ PC avec un simple code, sans fichier.',
+    'Affichage mobile entièrement repensé : navigation, portefeuille et tutoriel adaptés au téléphone.',
+    'Fréquence bimensuelle (2×/mois) en plus du mensuel et de l\'hebdomadaire.',
+    'Import CSV désormais dans « Mon portefeuille », et un seul bouton de prix par groupe d\'émetteurs.'
+  ]}
+];
+
+// Compare deux versions "x.y.z" → -1, 0, 1
+function compareVer(a,b){
+  const pa=String(a||'0').split('.').map(n=>parseInt(n,10)||0);
+  const pb=String(b||'0').split('.').map(n=>parseInt(n,10)||0);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){
+    const x=pa[i]||0,y=pb[i]||0;
+    if(x<y)return -1;if(x>y)return 1;
+  }
+  return 0;
+}
+
+// Décide s'il faut montrer le "Quoi de neuf", et lequel.
+function maybeShowChangelog(isNewUser){
+  if(!CHANGELOG.length)return;
+  const newest=CHANGELOG[0].v;
+  // 1) Nouveau visiteur : on n'affiche rien, on mémorise juste l'état actuel.
+  if(isNewUser){ state._seenChangelog=newest; save(); return; }
+  const seen=state._seenChangelog;
+  let toShow;
+  if(seen==null){
+    // 2) Utilisateur existant qui découvre la fonctionnalité : on ne déverse pas
+    //    tout l'historique, juste la dernière entrée.
+    toShow=[CHANGELOG[0]];
+  } else {
+    // 3) Utilisateur connu : tout ce qui est plus récent que ce qu'il a vu.
+    toShow=CHANGELOG.filter(e=>compareVer(e.v,seen)>0);
+  }
+  // Toujours mémoriser la version la plus récente comme "vue" (même si rien à montrer).
+  state._seenChangelog=newest; save();
+  if(!toShow.length)return;
+  showChangelogModal(toShow);
+}
+
+// Affiche le pop-up regroupant une ou plusieurs entrées.
+function showChangelogModal(entries){
+  const ov=document.createElement('div');ov.className='overlay';ov.style.zIndex='9998';
+  const box=document.createElement('div');box.className='modal';box.style.maxWidth='440px';
+  let h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem;">'
+    +'<div style="font-size:15px;font-weight:600;">&#10024; Quoi de neuf</div>'
+    +'<button id="cl-close" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;cursor:pointer;">&#215;</button></div>';
+  entries.forEach(e=>{
+    h+='<div style="margin-top:.6rem;">'
+      +'<div style="font-size:11px;font-family:var(--mono);color:var(--accent);margin-bottom:6px;">v'+e.v+(e.d?' · '+e.d:'')+'</div>'
+      +'<ul style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:5px;">';
+    e.items.forEach(it=>{ h+='<li style="font-size:12px;color:var(--text2);line-height:1.45;">'+it+'</li>'; });
+    h+='</ul></div>';
+  });
+  h+='<button id="cl-ok" class="btn-add" style="width:100%;margin-top:1rem;">Super, merci !</button>';
+  box.innerHTML=h;ov.appendChild(box);
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey);};
+  const onKey=ev=>{if(ev.key==='Escape')close();};
+  ov.addEventListener('click',ev=>{if(ev.target===ov)close();});
+  document.addEventListener('keydown',onKey);
+  document.body.appendChild(ov);
+  box.querySelector('#cl-close').onclick=close;
+  box.querySelector('#cl-ok').onclick=close;
+}
+window.maybeShowChangelog=maybeShowChangelog;
 // Replie/déplie un bloc (Projection par ETF, Performances, Fiscalité).
 // L'état ouvert/fermé est mémorisé dans le state pour rester comme l'utilisateur l'a laissé.
 function toggleCollapse(key){
@@ -2314,15 +2407,17 @@ function onProjStepChange(){
   document.getElementById('proj-monthly').step=step;
   document.getElementById('proj-monthly-input').step=step;
 }
-function syncProjSliders(){document.getElementById('proj-monthly').value=state.monthly;document.getElementById('proj-monthly-val').textContent=state.monthly+' €';const mi=document.getElementById('proj-monthly-input');if(mi)mi.value=state.monthly;const r=state.expectedReturn||8;document.getElementById('proj-return').value=r;document.getElementById('proj-return-val').textContent=r+'%';}
+function syncProjSliders(){document.getElementById('proj-monthly').value=state.monthly;document.getElementById('proj-monthly-val').textContent=state.monthly+' €';const mi=document.getElementById('proj-monthly-input');if(mi)mi.value=state.monthly;const r=state.expectedReturn||8;document.getElementById('proj-return').value=r;document.getElementById('proj-return-val').textContent=r+'%';const inf=state.expectedInflation!=null?state.expectedInflation:3;const infEl=document.getElementById('proj-inflation');if(infEl){infEl.value=inf;document.getElementById('proj-inflation-val').textContent=inf+'%';}}
 function updateProj(){
   const years=+document.getElementById('proj-years').value,ret=+document.getElementById('proj-return').value;
+  const infl=+(document.getElementById('proj-inflation')?.value||0); // inflation annuelle (%)
   // L'épargne : le champ manuel est la source de vérité (il peut dépasser le max du curseur)
   const mInput=document.getElementById('proj-monthly-input');
   const monthly=mInput?(+mInput.value||0):(+document.getElementById('proj-monthly').value);
   document.getElementById('proj-years-val').textContent=years+' ans';document.getElementById('proj-monthly-val').textContent=monthly+' €';document.getElementById('proj-return-val').textContent=ret+'%';
+  const inflValEl=document.getElementById('proj-inflation-val');if(inflValEl)inflValEl.textContent=infl+'%';
   // Le slider de rendement est la source de vérité — on le mémorise
-  state.expectedReturn=ret;save();
+  state.expectedReturn=ret;state.expectedInflation=infl;save();
   const r=ret/100/12,n=years*12;
   const labels=[],base=[],opt=[],pess=[],invested=[];
 
@@ -2352,16 +2447,38 @@ function updateProj(){
     for(let i=0;i<=n;i++){const lbl=i===0?'Auj.':(i%12===0?'A'+i/12:null);if(lbl!==null){labels.push(lbl);const inv=curVal+monthly*i;const v=curVal*Math.pow(1+r,i)+monthly*(Math.pow(1+r,i)-1)/r;const vO=curVal*Math.pow(1+r*1.5,i)+monthly*(Math.pow(1+r*1.5,i)-1)/(r*1.5);const vP=curVal*Math.pow(1+r*0.5,i)+monthly*(Math.pow(1+r*0.5,i)-1)/(r*0.5);base.push(Math.round(v));opt.push(Math.round(vO));pess.push(Math.round(vP));invested.push(Math.round(inv));}}
   }
   const fv=base[base.length-1],fi=invested[invested.length-1];
-  // Valeur nette après fiscalité PEA, selon l'horizon : ≥5 ans → seuls les
-  // prélèvements sociaux (18,6%) s'appliquent sur la plus-value ; <5 ans → PFU 31,4%.
-  const _pv=Math.max(0,fv-fi);
+  // ── Valeur RÉELLE (pouvoir d'achat d'aujourd'hui) ────────────────
+  // On déflate chaque jalon annuel par l'inflation cumulée correspondante :
+  //   valeur_réelle(année t) = valeur_nominale(t) / (1 + infl)^t
+  // La courbe "réelle" montre ce que vaudra réellement ton capital en euros
+  // d'aujourd'hui. À 0% d'inflation et sans impôt, elle se confond avec la nominale.
+  //
+  // ── Courbe "Valeur réelle nette" : impôt PEA + inflation, en € d'aujourd'hui ──
+  // Pour chaque jalon annuel t : on retire l'impôt PEA sur la plus-value (PFU 31,4%
+  // si retrait avant 5 ans, sinon seuls les prélèvements sociaux 18,6%), puis on
+  // déflate par l'inflation cumulée. C'est "ce que tu pourrais réellement dépenser,
+  // en argent d'aujourd'hui, si tu retirais cette année-là".
+  const realNetSeries=[];
+  for(let k=0;k<base.length;k++){
+    const t=k; // nombre d'années depuis aujourd'hui
+    const gain=Math.max(0,base[k]-invested[k]);
+    const rate=t>=5?0.186:0.314;
+    const afterTax=base[k]-gain*rate;
+    const deflate=Math.pow(1+infl/100,t);
+    realNetSeries.push(Math.round(afterTax/deflate));
+  }
+  const fvRealNet=realNetSeries[realNetSeries.length-1]; // valeur réelle nette finale
   const _netRate=years>=5?0.186:0.314;
-  const _net=fv-_pv*_netRate;
-  const _netLabel=years>=5?'net après PEA (PS 18,6%)':'net après PEA (PFU 31,4%)';
+  const _netInfo=years>=5?'PS 18,6%':'PFU 31,4%';
   const modeLabel=usingSim
     ?'<span style="font-size:10px;font-family:var(--mono);color:var(--green);">● simulation détaillée par ETF</span>'
     :'<span style="font-size:10px;font-family:var(--mono);color:var(--text3);">● estimation globale (ajoute des ETF avec prix pour affiner)</span>';
-  document.getElementById('proj-metrics').innerHTML='<div style="grid-column:1/-1;margin-bottom:6px;">'+modeLabel+'</div><div class="metric"><div class="metric-label">valeur finale</div><div class="metric-value blue">'+fv.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">total investi</div><div class="metric-value">'+fi.toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">plus-value</div><div class="metric-value green">+'+(fv-fi).toLocaleString('fr-FR')+' €</div></div><div class="metric"><div class="metric-label">multiplicateur</div><div class="metric-value purple">×'+(fv/Math.max(fi,1)).toFixed(1)+'</div></div><div class="metric"><div class="metric-label">'+_netLabel+'</div><div class="metric-value" style="color:'+(years>=5?'var(--green)':'var(--amber)')+';">'+Math.round(_net).toLocaleString('fr-FR')+' €</div></div>';
+  document.getElementById('proj-metrics').innerHTML='<div style="grid-column:1/-1;margin-bottom:6px;">'+modeLabel+'</div>'
+    +'<div class="metric"><div class="metric-label">valeur finale (brut)</div><div class="metric-value blue">'+fv.toLocaleString('fr-FR')+' €</div></div>'
+    +'<div class="metric"><div class="metric-label">total investi</div><div class="metric-value">'+fi.toLocaleString('fr-FR')+' €</div></div>'
+    +'<div class="metric"><div class="metric-label">plus-value</div><div class="metric-value green">+'+(fv-fi).toLocaleString('fr-FR')+' €</div></div>'
+    +'<div class="metric"><div class="metric-label">multiplicateur</div><div class="metric-value purple">×'+(fv/Math.max(fi,1)).toFixed(1)+'</div></div>'
+    +'<div class="metric"><div class="metric-label">valeur réelle nette</div><div class="metric-value" style="color:var(--accent);" title="Ce que tu pourrais réellement dépenser en argent d\'aujourd\'hui : valeur finale après impôt PEA ('+_netInfo+') puis corrigée de l\'inflation ('+infl+'%/an sur '+years+' ans).">'+fvRealNet.toLocaleString('fr-FR')+' €</div></div>';
   const ctx=document.getElementById('chart-proj');
   // Mémoriser quelles courbes l'utilisateur avait masquées (cliquées dans la légende)
   // pour les restaurer après recréation du graphique (sinon elles réapparaissent).
@@ -2374,7 +2491,7 @@ function updateProj(){
     chartProj.destroy();
   }
   const eur=v=>Math.round(v).toLocaleString('fr-FR')+' €';
-  chartProj=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'Optimiste ('+(ret*1.5).toFixed(1)+'%)',data:opt,borderColor:'rgba(52,211,153,.4)',fill:false,tension:.4,pointRadius:0,pointHoverRadius:4,borderDash:[3,3]},{label:'Base ('+ret+'%)',data:base,borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,.07)',fill:true,tension:.4,pointRadius:0,pointHoverRadius:5,borderWidth:2},{label:'Prudent ('+(ret*0.5).toFixed(1)+'%)',data:pess,borderColor:'rgba(251,191,36,.4)',fill:false,tension:.4,pointRadius:0,pointHoverRadius:4,borderDash:[3,3]},{label:'Investi',data:invested,borderColor:'#555a66',fill:false,tension:0,pointRadius:0,pointHoverRadius:4,borderDash:[6,4]}]},options:{
+  chartProj=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'Optimiste ('+(ret*1.5).toFixed(1)+'%)',data:opt,borderColor:'rgba(52,211,153,.4)',fill:false,tension:.4,pointRadius:0,pointHoverRadius:4,borderDash:[3,3]},{label:'Base ('+ret+'%)',data:base,borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,.07)',fill:true,tension:.4,pointRadius:0,pointHoverRadius:5,borderWidth:2},{label:'Prudent ('+(ret*0.5).toFixed(1)+'%)',data:pess,borderColor:'rgba(251,191,36,.4)',fill:false,tension:.4,pointRadius:0,pointHoverRadius:4,borderDash:[3,3]},{label:'Investi',data:invested,borderColor:'#555a66',fill:false,tension:0,pointRadius:0,pointHoverRadius:4,borderDash:[6,4]},{label:'Valeur réelle nette',data:realNetSeries,borderColor:'#a78bfa',fill:false,tension:.4,pointRadius:0,pointHoverRadius:4,borderDash:[2,2],borderWidth:2}]},options:{
     responsive:true,maintainAspectRatio:false,
     interaction:{mode:'index',intersect:false,axis:'x'}, // survol n'importe où en X → toutes les courbes
     plugins:{
@@ -2960,5 +3077,11 @@ refreshUndoBtn();
 if(!state._tourDone && (!state.etfs || state.etfs.length===0)){
   setTimeout(()=>{ if(typeof startTour==='function' && (!state.etfs||state.etfs.length===0)) startTour(); }, 1400);
 }
+// "Quoi de neuf" pour les utilisateurs qui reviennent (jamais pour un nouveau,
+// ni par-dessus la visite guidée).
+setTimeout(()=>{
+  try{ if(typeof tourActive==='function' && tourActive())return;
+       maybeShowChangelog(_isNewUser); }catch(e){}
+}, _isNewUser?0:900);
 
 }); // DOMContentLoaded

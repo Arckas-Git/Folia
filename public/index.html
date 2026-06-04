@@ -185,6 +185,7 @@
       <label>Durée</label><input type="range" id="proj-years" min="1" max="40" value="20" oninput="updateProj()"/><span class="proj-val" id="proj-years-val">20 ans</span>
       <label>Épargne/mois</label><input type="range" id="proj-monthly" min="50" max="5000" step="25" value="500" oninput="onProjMonthlySlider()"/><span class="proj-val" id="proj-monthly-val">500 €</span>
       <label>Rendement/an</label><input type="range" id="proj-return" min="1" max="20" step="0.5" value="8" oninput="updateProj()"/><span class="proj-val" id="proj-return-val">8%</span>
+      <label>Inflation/an</label><input type="range" id="proj-inflation" min="0" max="6" step="0.1" value="3" oninput="updateProj()"/><span class="proj-val" id="proj-inflation-val">3%</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding:9px 11px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);">
       <span style="font-size:11px;color:var(--text3);font-family:var(--mono);">Montant précis :</span>
@@ -306,7 +307,7 @@
     <button class="btn-ghost" style="width:100%;" onclick="goToManualEntry()">Ajouter mes ETF manuellement →</button>
   </div>
 </div>
-<footer>Folia · v1.50.0 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.51.0 · Planificateur DCA PEA · Données indicatives</footer>
 <script src="app.js" defer></script>
 </body>
 </html>
