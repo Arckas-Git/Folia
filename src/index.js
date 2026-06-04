@@ -183,6 +183,83 @@ async function handlePrice(url) {
   return jsonResponse({ error: 'Symbole introuvable : ' + (ticker || isin) });
 }
 
+// ════════════════════════════════════════════════════════════════
+// SYNCHRONISATION PAR CODE (mobile ↔ PC, sans compte)
+//
+// Principe : un appareil envoie ses données → le Worker les range dans le
+// stockage KV sous un code court aléatoire → l'autre appareil entre ce code
+// pour récupérer les données. Le code expire automatiquement après 30 jours.
+//
+// ⚠ Nécessite un "espace KV" (Cloudflare KV) relié au Worker sous le nom
+//   FOLIA_KV (voir le guide de déploiement). Sans lui, la synchro renvoie une
+//   erreur claire, mais le reste du site (prix inclus) fonctionne normalement.
+// ════════════════════════════════════════════════════════════════
+
+const SYNC_TTL = 30 * 24 * 60 * 60;          // durée de vie d'un code : 30 jours (en secondes)
+const SYNC_MAX_BYTES = 2 * 1024 * 1024;      // taille max acceptée : 2 Mo (large)
+// Alphabet sans caractères ambigus (pas de 0/O, 1/I/L) pour faciliter la saisie.
+const SYNC_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+// Génère un code aléatoire de 6 caractères (~887 millions de combinaisons).
+function makeSyncCode() {
+  const arr = new Uint8Array(6);
+  crypto.getRandomValues(arr);
+  let s = '';
+  for (let i = 0; i < 6; i++) s += SYNC_ALPHABET[arr[i] % SYNC_ALPHABET.length];
+  return s;
+}
+
+// Sauvegarde : reçoit les données (POST), renvoie un code.
+async function handleSyncSave(request, env) {
+  if (!env.FOLIA_KV) {
+    return jsonResponse({ error: 'La synchronisation n\'est pas encore configurée (espace KV manquant).' });
+  }
+  if (request.method !== 'POST') {
+    return jsonResponse({ error: 'Méthode non autorisée' });
+  }
+  const body = await request.text();
+  if (!body || body.length > SYNC_MAX_BYTES) {
+    return jsonResponse({ error: 'Données vides ou trop volumineuses' });
+  }
+  // Vérifie que c'est bien du JSON (sécurité minimale)
+  try { JSON.parse(body); } catch (e) { return jsonResponse({ error: 'Données invalides' }); }
+
+  // Trouve un code libre (quelques tentatives en cas de collision improbable)
+  let code = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = makeSyncCode();
+    const existing = await env.FOLIA_KV.get(candidate);
+    if (!existing) { code = candidate; break; }
+  }
+  if (!code) return jsonResponse({ error: 'Impossible de générer un code, réessaie' });
+
+  await env.FOLIA_KV.put(code, body, { expirationTtl: SYNC_TTL });
+  const expiresAt = new Date(Date.now() + SYNC_TTL * 1000).toISOString();
+  return jsonResponse({ code: code, expiresAt: expiresAt });
+}
+
+// Récupération : reçoit un code (GET ?code=XXX), renvoie les données.
+async function handleSyncLoad(url, env) {
+  if (!env.FOLIA_KV) {
+    return jsonResponse({ error: 'La synchronisation n\'est pas encore configurée (espace KV manquant).' });
+  }
+  const code = (url.searchParams.get('code') || '').trim().toUpperCase();
+  if (!code || code.length < 4) return jsonResponse({ error: 'Code manquant ou invalide' });
+  const data = await env.FOLIA_KV.get(code);
+  if (data == null) {
+    return jsonResponse({ error: 'Code introuvable ou expiré' });
+  }
+  // On renvoie les données telles quelles (déjà du JSON)
+  return new Response(data, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
 // Point d'entrée du Worker.
 export default {
   async fetch(request, env) {
@@ -195,7 +272,16 @@ export default {
         return jsonResponse({ error: 'Erreur serveur : ' + (e.message || String(e)) });
       }
     }
-    // 2) Tout le reste → fichiers statiques du site (servis depuis public/)
+    // 2) Synchro : sauvegarder (POST) / récupérer (GET)
+    if (url.pathname === '/api/sync/save') {
+      try { return await handleSyncSave(request, env); }
+      catch (e) { return jsonResponse({ error: 'Erreur synchro : ' + (e.message || String(e)) }); }
+    }
+    if (url.pathname === '/api/sync/load') {
+      try { return await handleSyncLoad(url, env); }
+      catch (e) { return jsonResponse({ error: 'Erreur synchro : ' + (e.message || String(e)) }); }
+    }
+    // 3) Tout le reste → fichiers statiques du site (servis depuis public/)
     return env.ASSETS.fetch(request);
   },
 };
