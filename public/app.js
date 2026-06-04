@@ -239,14 +239,45 @@ function confirmModal(message,opts){
   });
 }
 // Ouvre/ferme une bulle d'aide (icône ⓘ). L'élément cible est passé.
+// On vise le .info-tip qui SUIT immédiatement la ligne/le label cliqué, pour
+// éviter d'ouvrir la mauvaise bulle quand plusieurs cohabitent dans un même bloc.
 function toggleInfo(ic){
-  const tip=ic.closest('.info-row')?.parentElement?.querySelector('.info-tip')
-          ||ic.parentElement?.parentElement?.querySelector('.info-tip');
+  // 1) Cas "info-row" : le tip est le frère suivant de la ligne.
+  const row=ic.closest('.info-row');
+  let tip=null;
+  if(row){
+    let n=row.nextElementSibling;
+    // On avance jusqu'au prochain .info-tip, en s'arrêtant si on rencontre
+    // une autre .info-row (= on a dépassé la zone de cette bulle).
+    while(n){
+      if(n.classList&&n.classList.contains('info-tip')){tip=n;break;}
+      if(n.classList&&n.classList.contains('info-row'))break;
+      n=n.nextElementSibling;
+    }
+  }
+  // 2) Cas "label" (ⓘ dans un <label>) : le tip suit le label parent.
+  if(!tip){
+    const lbl=ic.closest('label');
+    if(lbl&&lbl.nextElementSibling&&lbl.nextElementSibling.classList&&lbl.nextElementSibling.classList.contains('info-tip')){
+      tip=lbl.nextElementSibling;
+    }
+  }
+  // 3) Repli : ancien comportement (premier tip du parent).
+  if(!tip){tip=ic.closest('.info-row')?.parentElement?.querySelector('.info-tip')||ic.parentElement?.parentElement?.querySelector('.info-tip');}
   if(!tip)return;
   const open=tip.classList.toggle('open');
   ic.classList.toggle('open',open);
 }
 window.toggleInfo=toggleInfo;
+// Déplie/replie l'explication de la "valeur réelle nette" (placée sous la grille
+// de métriques, car les tuiles sont trop étroites pour contenir le texte).
+function toggleRealNetInfo(ic){
+  const tip=document.getElementById('proj-realnet-tip');
+  if(!tip)return;
+  const open=tip.classList.toggle('open');
+  ic.classList.toggle('open',open);
+}
+window.toggleRealNetInfo=toggleRealNetInfo;
 
 // ════════════════════════════════════════════════════════════════
 // "QUOI DE NEUF" — petit pop-up des nouveautés pour les utilisateurs
@@ -268,7 +299,7 @@ window.toggleInfo=toggleInfo;
 // ════════════════════════════════════════════════════════════════
 const CHANGELOG=[
   {v:'1.51.0',d:'juin 2026',items:[
-    'Projection : nouveau curseur « Inflation » (3% par défaut). En plus de la valeur brute, la projection affiche désormais la « valeur réelle nette » — ce que ton capital vaudra vraiment en argent d\'aujourd\'hui, une fois l\'impôt PEA et l\'inflation pris en compte — avec sa courbe sur le graphique.'
+    'Projection : nouveau curseur « Inflation » (3% par défaut). En plus de la valeur brute, la projection affiche désormais la « valeur réelle nette » — ce que ton capital vaudra vraiment en argent d\'aujourd\'hui, une fois l\'impôt PEA et l\'inflation pris en compte — avec sa courbe sur le graphique et une bulle ⓘ qui explique le calcul.'
   ]},
   {v:'1.50.0',d:'juin 2026',items:[
     '✨ Cette fenêtre « Quoi de neuf » : tu verras les nouveautés à chaque retour sur le site.',
@@ -2478,7 +2509,7 @@ function updateProj(){
     +'<div class="metric"><div class="metric-label">total investi</div><div class="metric-value">'+fi.toLocaleString('fr-FR')+' €</div></div>'
     +'<div class="metric"><div class="metric-label">plus-value</div><div class="metric-value green">+'+(fv-fi).toLocaleString('fr-FR')+' €</div></div>'
     +'<div class="metric"><div class="metric-label">multiplicateur</div><div class="metric-value purple">×'+(fv/Math.max(fi,1)).toFixed(1)+'</div></div>'
-    +'<div class="metric"><div class="metric-label">valeur réelle nette</div><div class="metric-value" style="color:var(--accent);" title="Ce que tu pourrais réellement dépenser en argent d\'aujourd\'hui : valeur finale après impôt PEA ('+_netInfo+') puis corrigée de l\'inflation ('+infl+'%/an sur '+years+' ans).">'+fvRealNet.toLocaleString('fr-FR')+' €</div></div>';
+    +'<div class="metric"><div class="metric-label" style="display:flex;align-items:center;gap:5px;">valeur réelle nette<span class="info-ic" onclick="toggleRealNetInfo(this)" style="width:13px;height:13px;font-size:9px;">i</span></div><div class="metric-value" style="color:var(--accent);" title="Ce que tu pourrais réellement dépenser en argent d\'aujourd\'hui : valeur finale après impôt PEA ('+_netInfo+') puis corrigée de l\'inflation ('+infl+'%/an sur '+years+' ans).">'+fvRealNet.toLocaleString('fr-FR')+' €</div></div>';
   const ctx=document.getElementById('chart-proj');
   // Mémoriser quelles courbes l'utilisateur avait masquées (cliquées dans la légende)
   // pour les restaurer après recréation du graphique (sinon elles réapparaissent).
@@ -2522,9 +2553,9 @@ function updateProj(){
   const PV=Math.max(0,fv-fi),PS=0.186,FT=0.314,netA=fv-PV*PS,netB=fv-PV*FT,fmt=v=>Math.round(v).toLocaleString('fr-FR');
   const fc=document.getElementById('body-fiscal');
   fc.innerHTML=''
-    +(years<5?'<div style="background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:var(--r);padding:.9rem;margin-bottom:.75rem;"><div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:.65rem;">AVANT 5 ANS — Votre horizon actuel</div><div style="font-size:12px;font-family:var(--mono);display:flex;flex-direction:column;gap:4px;"><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">IR (12.8%)</span><span style="color:var(--red)">−'+fmt(PV*.128)+' €</span></div><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">PS (18.6%)</span><span style="color:var(--red)">−'+fmt(PV*PS)+' €</span></div><div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4px;"><span style="color:var(--text3)">Total (31.4%)</span><span style="color:var(--red);font-weight:600;">−'+fmt(PV*FT)+' €</span></div></div><div style="margin-top:8px;background:var(--bg2);padding:7px 9px;border-radius:var(--r);"><div style="font-size:10px;color:var(--text3);">VALEUR NETTE</div><div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--red);">'+fmt(netB)+' €</div></div></div>':'')
-    +'<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:var(--r);padding:.9rem;"><div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:.65rem;">APRÈS 5 ANS'+(years>=5?' — Votre horizon ✓':'')+'</div><div style="font-size:12px;font-family:var(--mono);display:flex;flex-direction:column;gap:4px;"><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">IR sur PV</span><span style="color:var(--green)">Exonéré ✓</span></div><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">PS (18.6%)</span><span style="color:var(--amber)">−'+fmt(PV*PS)+' €</span></div></div><div style="margin-top:8px;background:var(--bg2);padding:7px 9px;border-radius:var(--r);"><div style="font-size:10px;color:var(--text3);">VALEUR NETTE</div><div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--green);">'+fmt(netA)+' €</div></div></div>'
-    +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:.75rem;">France 2026 · PS 18.6% · Avant 5 ans : PFU 31.4% · Plafond PEA : 150 000 €</div>';
+    +(years<5?'<div style="background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);border-radius:var(--r);padding:.9rem;margin-bottom:.75rem;"><div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:.65rem;">AVANT 5 ANS — Votre horizon actuel</div><div style="font-size:12px;font-family:var(--mono);display:flex;flex-direction:column;gap:4px;"><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">IR (12.8%)</span><span style="color:var(--red)">−'+fmt(PV*.128)+' €</span></div><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">PS (18.6%)</span><span style="color:var(--red)">−'+fmt(PV*PS)+' €</span></div><div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4px;"><span style="color:var(--text3)">Total (31.4%)</span><span style="color:var(--red);font-weight:600;">−'+fmt(PV*FT)+' €</span></div></div><div style="margin-top:8px;background:var(--bg2);padding:7px 9px;border-radius:var(--r);"><div style="font-size:10px;color:var(--text3);">VALEUR NETTE D\'IMPÔT</div><div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--red);">'+fmt(netB)+' €</div></div></div>':'')
+    +'<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:var(--r);padding:.9rem;"><div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:.65rem;">APRÈS 5 ANS'+(years>=5?' — Votre horizon ✓':'')+'</div><div style="font-size:12px;font-family:var(--mono);display:flex;flex-direction:column;gap:4px;"><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">IR sur PV</span><span style="color:var(--green)">Exonéré ✓</span></div><div style="display:flex;justify-content:space-between;"><span style="color:var(--text3)">PS (18.6%)</span><span style="color:var(--amber)">−'+fmt(PV*PS)+' €</span></div></div><div style="margin-top:8px;background:var(--bg2);padding:7px 9px;border-radius:var(--r);"><div style="font-size:10px;color:var(--text3);">VALEUR NETTE D\'IMPÔT</div><div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--green);">'+fmt(netA)+' €</div></div></div>'
+    +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:.75rem;">France 2026 · PS 18.6% · Avant 5 ans : PFU 31.4% · Plafond PEA : 150 000 € · Montants en euros futurs (hors inflation)</div>';
   renderEtfProjection(years,monthly,ret,simBase);
   applyCollapseState();
 }
