@@ -66,7 +66,10 @@ const DEFAULT_STATE={
   _archivedEtfs:[], // ETF supprimés, conservés pour récupération via la bibliothèque
   _tourDone:false, // visite guidée déjà vue/passée ?
   _obDismissed:false, // bannière de bienvenue fermée manuellement ?
-  _seenChangelog:null // version du dernier "Quoi de neuf" déjà vu par l'utilisateur
+  _seenChangelog:null, // version du dernier "Quoi de neuf" déjà vu par l'utilisateur
+  _section:null, // dernière section ouverte (dca / cashflow) ; null = jamais choisi
+  cashflow:{income:[],invest:[],expense:[]}, // données de la section Cashflow
+  _cfSeeded:false // modèle de départ déjà pré-rempli ?
 };
 
 const _loadedRaw=load();
@@ -74,6 +77,349 @@ const _isNewUser=(_loadedRaw===null); // aucune donnée existante = tout premier
 let state=_loadedRaw||JSON.parse(JSON.stringify(DEFAULT_STATE));
 let uiMode='simple';
 function save(){try{state.uiMode=uiMode;localStorage.setItem('folia_v3',JSON.stringify(state));}catch(e){}}
+
+// ══════════ NAVIGATION ENTRE SECTIONS (DCA / Cashflow / Hub) ══════════
+// Folia devient un hub multi-sections. Chaque section est un grand bloc
+// (#section-dca, #section-cashflow) ; le hub (#hub) est l'écran de choix.
+// La dernière section utilisée est mémorisée pour rouvrir directement dessus.
+function showSection(name,ev){
+  // Empêche le clic (venant d'un bouton du menu) de remonter au .tool-switch
+  // parent, ce qui rouvrait le menu et pouvait bloquer l'affichage.
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const hub=document.getElementById('hub');
+  const dca=document.getElementById('section-dca');
+  const cf=document.getElementById('section-cashflow');
+  if(!hub||!dca||!cf)return;
+  // Tout masquer
+  hub.style.display='none';dca.style.display='none';cf.style.display='none';
+  if(name==='hub'){ hub.style.display='flex'; }
+  else if(name==='cashflow'){
+    cf.style.display='block'; state._section='cashflow'; save();
+    // Filet de sécurité : la navigation interne du DCA a pu retirer la classe
+    // .active de cette page ; on la remet pour garantir l'affichage.
+    const cfPage=document.getElementById('page-cashflow'); if(cfPage)cfPage.classList.add('active');
+    try{ if(typeof cfSeedIfEmpty==='function')cfSeedIfEmpty(); if(typeof renderCashflow==='function')renderCashflow(); }catch(e){ console&&console.warn&&console.warn('Cashflow render:',e); }
+  }
+  else { dca.style.display='block'; state._section='dca'; save(); }
+  closeSectionMenu();
+}
+window.showSection=showSection;
+
+// Ouvre/ferme le menu déroulant de bascule (sur le logo).
+function toggleSectionMenu(ev){
+  if(ev){ev.stopPropagation();}
+  const sw=ev?ev.currentTarget:null;
+  const menu=sw?sw.querySelector('.section-menu'):null;
+  if(!menu)return;
+  const willOpen=!menu.classList.contains('open');
+  // Fermer tous les autres d'abord
+  document.querySelectorAll('.section-menu').forEach(m=>m.classList.remove('open'));
+  document.querySelectorAll('.tool-switch').forEach(s=>s.classList.remove('open'));
+  if(willOpen){menu.classList.add('open');sw.classList.add('open');}
+}
+window.toggleSectionMenu=toggleSectionMenu;
+function closeSectionMenu(){
+  document.querySelectorAll('.section-menu').forEach(m=>m.classList.remove('open'));
+  document.querySelectorAll('.tool-switch').forEach(s=>s.classList.remove('open'));
+}
+// Clic en dehors → ferme le menu
+document.addEventListener('click',e=>{ if(!e.target.closest('.tool-switch'))closeSectionMenu(); });
+
+// ══════════ MOTEUR CASHFLOW ══════════
+// Données : state.cashflow = {
+//   income : [{name,amount}]                      ← liste simple (1 niveau)
+//   invest : [{name, items:[{name,amount}]}]      ← catégories → sous-lignes (2 niveaux)
+//   expense: [{name, items:[{name,amount}]}]      ← idem
+// }
+// Folia calcule les totaux, le reste disponible et le taux d'épargne.
+// Aucune incidence sur le DCA.
+
+// Normalise la structure (et migre d'éventuelles anciennes données "à plat").
+function cfData(){
+  if(!state.cashflow||typeof state.cashflow!=='object')state.cashflow={income:[],invest:[],expense:[]};
+  const c=state.cashflow;
+  // Revenus : liste simple
+  c.income=(Array.isArray(c.income)?c.income:[]).map(r=>(r&&typeof r==='object')?{name:r.name||'',amount:Math.max(0,+r.amount||0)}:{name:'',amount:0});
+  // Investissements & Dépenses : 2 niveaux (catégorie → items)
+  ['invest','expense'].forEach(key=>{
+    let arr=Array.isArray(c[key])?c[key]:[];
+    // Migration : si l'ancien format "à plat" est détecté (des objets avec amount
+    // mais sans items), on les regroupe sous une catégorie unique.
+    if(arr.length&&arr.every(r=>r&&r.items===undefined)){
+      arr=[{name:key==='invest'?'Investissements':'Dépenses',items:arr.map(r=>({name:r.name||'',amount:Math.max(0,+r.amount||0)}))}];
+    }
+    // Normalisation des catégories
+    arr=arr.map(cat=>(cat&&typeof cat==='object')
+      ?{name:cat.name||'',items:(Array.isArray(cat.items)?cat.items:[]).map(it=>({name:it.name||'',amount:Math.max(0,+it.amount||0)}))}
+      :{name:'',items:[]});
+    c[key]=arr;
+  });
+  return c;
+}
+
+// Pré-remplit un modèle de départ la 1re fois que la section est vide.
+// Un drapeau (_cfSeeded) évite de re-remplir si l'utilisateur a tout effacé volontairement.
+function cfSeedIfEmpty(){
+  cfData();
+  if(state._cfSeeded)return;
+  const c=state.cashflow;
+  const empty=c.income.length===0&&c.invest.length===0&&c.expense.length===0;
+  if(empty){
+    c.income=[{name:'Salaire',amount:0}];
+    c.invest=[
+      {name:'PEA / Compte-titres',items:[{name:'',amount:0}]},
+      {name:'Assurance vie',items:[{name:'',amount:0}]}
+    ];
+    c.expense=[
+      {name:'Logement',items:[{name:'Loyer',amount:0},{name:'Charges',amount:0}]},
+      {name:'Vie quotidienne',items:[{name:'Courses',amount:0},{name:'Restaurants',amount:0}]},
+      {name:'Abonnements',items:[{name:'Internet / Téléphone',amount:0},{name:'Sport',amount:0}]}
+    ];
+  }
+  state._cfSeeded=true;save();
+}
+
+const _esc=s=>String(s||'').replace(/"/g,'&quot;');
+
+// ── Revenus (liste simple) ──
+function cfAddIncome(){const c=cfData();c.income.push({name:'',amount:0});save();renderCashflow();setTimeout(()=>{const l=document.getElementById('cf-list-income');if(l){const n=l.querySelectorAll('.cf-name');if(n.length)n[n.length-1].focus();}},30);}
+function cfDelIncome(i){const c=cfData();if(c.income[i]!==undefined){c.income.splice(i,1);save();renderCashflow();}}
+function cfSetIncome(i,field,val){const c=cfData();if(!c.income[i])return;if(field==='amount')c.income[i].amount=Math.max(0,+val||0);else c.income[i].name=val;save();cfUpdateTotals();}
+window.cfAddIncome=cfAddIncome;window.cfDelIncome=cfDelIncome;window.cfSetIncome=cfSetIncome;
+
+// ── Catégories (investissements & dépenses) ──
+function cfAddCat(kind){const c=cfData();c[kind].push({name:'',items:[{name:'',amount:0}]});save();renderCashflow();}
+function cfDelCat(kind,ci){const c=cfData();if(c[kind][ci]!==undefined){c[kind].splice(ci,1);save();renderCashflow();}}
+function cfSetCat(kind,ci,val){const c=cfData();if(!c[kind][ci])return;c[kind][ci].name=val;save();cfUpdateTotals();}
+function cfAddItem(kind,ci){const c=cfData();if(!c[kind][ci])return;c[kind][ci].items.push({name:'',amount:0});save();renderCashflow();}
+function cfDelItem(kind,ci,ii){const c=cfData();if(c[kind][ci]&&c[kind][ci].items[ii]!==undefined){c[kind][ci].items.splice(ii,1);save();renderCashflow();}}
+function cfSetItem(kind,ci,ii,field,val){const c=cfData();if(!c[kind][ci]||!c[kind][ci].items[ii])return;if(field==='amount')c[kind][ci].items[ii].amount=Math.max(0,+val||0);else c[kind][ci].items[ii].name=val;save();cfUpdateTotals();}
+window.cfAddCat=cfAddCat;window.cfDelCat=cfDelCat;window.cfSetCat=cfSetCat;window.cfAddItem=cfAddItem;window.cfDelItem=cfDelItem;window.cfSetItem=cfSetItem;
+
+// ── Totaux ──
+function cfSumIncome(){return cfData().income.reduce((s,r)=>s+(+r.amount||0),0);}
+function cfCatTotal(cat){return (cat.items||[]).reduce((s,it)=>s+(+it.amount||0),0);}
+function cfSumCats(key){return cfData()[key].reduce((s,cat)=>s+cfCatTotal(cat),0);}
+
+function cfUpdateTotals(){
+  const inc=cfSumIncome(),inv=cfSumCats('invest'),exp=cfSumCats('expense');
+  const left=inc-inv-exp;
+  const rate=inc>0?(inv/inc*100):0;            // taux d'épargne = investi / revenus
+  const possible=inc>0?((inc-exp)/inc*100):0;  // taux d'épargne possible = (revenus - dépenses)/revenus
+  const fmt=n=>Math.round(n).toLocaleString('fr-FR')+' €';
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('cf-total-income',fmt(inc));set('cf-total-invest',fmt(inv));set('cf-total-expenses',fmt(exp));
+  set('cf-hb-income',fmt(inc));set('cf-hb-invest',fmt(inv));set('cf-hb-expenses',fmt(exp));
+  set('cf-hb-left',fmt(left));set('cf-hb-rate',inc>0?rate.toFixed(1)+' %':'—');
+  const leftEl=document.getElementById('cf-hb-left');if(leftEl)leftEl.style.color=left<0?'var(--red)':'var(--green)';
+  // Totaux par catégorie (affichés dans chaque en-tête de catégorie)
+  ['invest','expense'].forEach(key=>{
+    cfData()[key].forEach((cat,ci)=>{const e=document.getElementById('cf-cat-total-'+key+'-'+ci);if(e)e.textContent=fmt(cfCatTotal(cat));});
+  });
+  const sum=document.getElementById('cf-summary');
+  if(sum){
+    if(inc<=0){sum.innerHTML='<span style="color:var(--text3);font-family:var(--mono);font-size:12px;">Ajoute au moins un revenu pour voir ton taux d\'épargne.</span>';}
+    else{
+      const warn=left<0?'<div style="color:var(--red);font-size:12px;font-family:var(--mono);margin-top:6px;">⚠ Tes sorties dépassent tes revenus : tu puises dans tes réserves.</div>':'';
+      sum.innerHTML='Ton taux d\'épargne est de <strong style="color:var(--accent);">'+rate.toFixed(1)+' %</strong> '
+        +'<span style="color:var(--text3);">(possible jusqu\'à '+possible.toFixed(1)+' %)</span>.<br>'
+        +'Revenus <strong>'+fmt(inc)+'</strong> · investis <strong>'+fmt(inv)+'</strong> · dépenses <strong>'+fmt(exp)+'</strong> · '
+        +'reste disponible <strong style="color:'+(left<0?'var(--red)':'var(--green)')+';">'+fmt(left)+'</strong>.'+warn;
+    }
+  }
+  // (Le tri et le diagramme se mettent à jour à la FIN de la frappe — voir cfOnCommit.)
+}
+
+// ── Rendu ──
+// Petit suffixe "€" affiché à droite de chaque montant.
+const CF_EUR='<span class="cf-eur">€</span>';
+
+function cfRenderIncome(){
+  const list=document.getElementById('cf-list-income');if(!list)return;
+  const arr=cfData().income;
+  if(!arr.length){list.innerHTML='<div class="cf-empty">Aucun revenu pour l\'instant.</div>';return;}
+  // Rendu dans l'ordre des données ; le tri visuel (décroissant) est géré par
+  // cfReorder() via l'ordre flexbox, sans reconstruire le HTML (garde le focus).
+  list.innerHTML=arr.map((r,i)=>'<div class="cf-row">'
+    +'<input class="cf-name" type="text" placeholder="Nom" value="'+_esc(r.name)+'" oninput="cfSetIncome('+i+',\'name\',this.value)" onchange="cfOnCommit()"/>'
+    +'<input class="cf-amt" type="number" min="0" step="10" placeholder="0" value="'+(r.amount||0)+'" oninput="cfSetIncome('+i+',\'amount\',this.value)" onchange="cfOnCommit()"/>'+CF_EUR
+    +'<button class="cf-del" title="Supprimer" onclick="cfDelIncome('+i+')">&times;</button>'
+    +'</div>').join('');
+}
+function cfRenderCats(key){
+  const list=document.getElementById(key==='expense'?'cf-list-expenses':'cf-list-invest');if(!list)return;
+  const cats=cfData()[key];
+  if(!cats.length){list.innerHTML='<div class="cf-empty">Aucune catégorie pour l\'instant.</div>';return;}
+  list.innerHTML=cats.map((cat,ci)=>{
+    const items=(cat.items||[]).map((it,ii)=>'<div class="cf-row">'
+      +'<input class="cf-name" type="text" placeholder="Nom" value="'+_esc(it.name)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'name\',this.value)" onchange="cfOnCommit()"/>'
+      +'<input class="cf-amt" type="number" min="0" step="10" placeholder="0" value="'+(it.amount||0)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'amount\',this.value)" onchange="cfOnCommit()"/>'+CF_EUR
+      +'<button class="cf-del" title="Supprimer" onclick="cfDelItem(\''+key+'\','+ci+','+ii+')">&times;</button>'
+      +'</div>').join('');
+    return '<div class="cf-cat">'
+      +'<div class="cf-cat-head">'
+      +'<input class="cf-cat-name" type="text" placeholder="Nom de la catégorie" value="'+_esc(cat.name)+'" oninput="cfSetCat(\''+key+'\','+ci+',this.value)" onchange="cfOnCommit()"/>'
+      +'<span class="cf-cat-total" id="cf-cat-total-'+key+'-'+ci+'">0 €</span>'
+      +'<button class="cf-del cf-del-cat" title="Supprimer la catégorie" onclick="cfDelCat(\''+key+'\','+ci+')">&times;</button>'
+      +'</div>'
+      +'<div class="cf-cat-items">'+items+'</div>'
+      +'<button class="cf-add-item" onclick="cfAddItem(\''+key+'\','+ci+')">+ Ajouter une ligne</button>'
+      +'</div>';
+  }).join('');
+}
+// Réordonne VISUELLEMENT (ordre flexbox) par montant DÉCROISSANT, sans toucher
+// au HTML — donc utilisable en direct pendant la saisie sans perdre le focus.
+function cfReorderList(container,childSel){
+  if(!container)return;
+  const els=[...container.querySelectorAll(':scope > '+childSel)];
+  const amt=el=>{let s=0;el.querySelectorAll('.cf-amt').forEach(i=>s+=(+i.value||0));return s;};
+  els.map(el=>({el,a:amt(el)})).sort((x,y)=>y.a-x.a).forEach((o,rank)=>{o.el.style.order=rank;});
+}
+function cfReorder(){
+  cfReorderList(document.getElementById('cf-list-income'),'.cf-row');
+  ['invest','expense'].forEach(key=>{
+    const list=document.getElementById(key==='expense'?'cf-list-expenses':'cf-list-invest');
+    if(!list)return;
+    cfReorderList(list,'.cf-cat'); // catégories entre elles (par total)
+    list.querySelectorAll('.cf-cat-items').forEach(items=>cfReorderList(items,'.cf-row')); // lignes dans chaque catégorie
+  });
+}
+function renderCashflow(){
+  cfData();
+  cfRenderIncome();
+  cfRenderCats('invest');
+  cfRenderCats('expense');
+  cfUpdateTotals();
+  cfReorder();              // tri visuel (décroissant) à l'affichage
+  if(typeof renderSankey==='function')renderSankey();
+}
+window.renderCashflow=renderCashflow;
+// Déclenché à la FIN de la frappe (onchange = quand on quitte un champ) :
+// c'est là qu'on réordonne et qu'on met à jour le diagramme, pour ne pas
+// perturber la saisie en cours.
+function cfOnCommit(){
+  if(typeof cfReorder==='function')cfReorder();
+  if(typeof renderSankey==='function')renderSankey();
+}
+window.cfOnCommit=cfOnCommit;
+
+// ══════════ DIAGRAMME DE FLUX (Sankey maison, SVG pur) ══════════
+// 4 colonnes : Revenus → Budget → Catégories (+ Reste disponible) → Sous-postes.
+// La largeur de chaque ruban est proportionnelle au montant. Aucune librairie.
+function renderSankey(){
+  const host=document.getElementById('cf-sankey');if(!host)return;
+  const d=cfData();
+  const incomes=d.income.filter(r=>(+r.amount||0)>0).map(r=>({name:r.name||'Revenu',value:+r.amount}));
+  const T=incomes.reduce((s,r)=>s+r.value,0);
+  if(T<=0){host.innerHTML='<div class="cf-empty" style="padding:34px 0;">Renseigne tes revenus (et des montants) pour afficher le diagramme de flux.</div>';return;}
+  // Catégories (enveloppes d'invest + catégories de dépenses), seulement celles >0
+  // Palette volontairement désaturée (tons doux) pour rester lisible sur fond sombre.
+  const palette=['#5fa98c','#9b90c0','#cf9a5f','#5faaa0','#6f97c4','#c182a3','#cc8585','#ccae6f','#8a8fbf','#c8946f'];
+  let ci=0;const cats=[];
+  const pushCats=(list,fallback)=>{(list||[]).forEach(c=>{
+    const items=(c.items||[]).filter(it=>(+it.amount||0)>0).map(it=>({name:it.name||'—',value:+it.amount}));
+    const tot=items.reduce((s,it)=>s+it.value,0);
+    if(tot>0){const col=palette[ci%palette.length];ci++;cats.push({name:c.name||fallback,value:tot,color:col,items});}
+  });};
+  pushCats(d.invest,'Investissement');
+  pushCats(d.expense,'Dépense');
+  const allocated=cats.reduce((s,c)=>s+c.value,0);
+  const reste=Math.max(0,T-allocated);
+  // ── Géométrie ──
+  const W=900,nodeW=13,G=13;
+  const colX=[6,250,500,W-nodeW-6]; // x gauche de chaque colonne
+  const n0=incomes.length,n2=cats.length+(reste>0?1:0),n3=cats.reduce((s,c)=>s+c.items.length,0);
+  const maxNodes=Math.max(n0,1,n2,n3,1);
+  const H=Math.max(320,maxNodes*40);
+  // échelle : on prend la plus petite qui fait tenir chaque colonne
+  const colSums=[T,T,T,allocated];
+  const colN=[n0,1,n2,Math.max(n3,1)];
+  let scale=Infinity;
+  for(let k=0;k<4;k++){if(colSums[k]>0){const s=(H-(colN[k]-1)*G)/colSums[k];if(s<scale)scale=s;}}
+  if(!isFinite(scale)||scale<=0)scale=0.1;
+  const hOf=v=>Math.max(2,v*scale);
+  // placement vertical d'une colonne (centrée) → liste de {y,h}
+  function place(values){
+    const hs=values.map(hOf);const total=hs.reduce((a,b)=>a+b,0)+(values.length-1)*G;
+    let y=(H-total)/2;const out=[];for(let i=0;i<values.length;i++){out.push({y,h:hs[i]});y+=hs[i]+G;}return out;
+  }
+  const incPos=place(incomes.map(r=>r.value));
+  const budPos=place([T])[0];
+  const cat2vals=cats.map(c=>c.value).concat(reste>0?[reste]:[]);
+  const catPos=place(cat2vals);
+  const itemVals=[];cats.forEach(c=>c.items.forEach(it=>itemVals.push(it.value)));
+  const itemPos=itemVals.length?place(itemVals):[];
+  // ── Helpers SVG ──
+  const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const eur=v=>Math.round(v).toLocaleString('fr-FR')+' €';
+  function band(x0,y0,x1,y1,th,color){
+    const xm=(x0+x1)/2;
+    return '<path d="M '+x0+' '+y0+' C '+xm+' '+y0+', '+xm+' '+y1+', '+x1+' '+y1
+      +' L '+x1+' '+(y1+th)+' C '+xm+' '+(y1+th)+', '+xm+' '+(y0+th)+', '+x0+' '+(y0+th)+' Z" '
+      +'fill="'+color+'" opacity="0.34"/>';
+  }
+  function rect(x,p,color){return '<rect x="'+x+'" y="'+p.y+'" width="'+nodeW+'" height="'+p.h+'" rx="3" fill="'+color+'"/>';}
+  function pill(x,yc,text,anchor){
+    const fs=9,w=text.length*5.1+9,h=14;
+    const rx=anchor==='start'?x-4:x-w+4;
+    const tx=anchor==='start'?x+2:x-2;
+    return '<g><rect x="'+rx+'" y="'+(yc-h/2)+'" width="'+w+'" height="'+h+'" rx="3" fill="#000" opacity="0.5"/>'
+      +'<text x="'+tx+'" y="'+(yc+3)+'" font-size="'+fs+'" fill="#e8eaf0" font-family="ui-monospace,monospace" text-anchor="'+anchor+'">'+esc(text)+'</text></g>';
+  }
+  // ── Construction ──
+  let links='',nodes='',labels='';
+  const incOut=incPos.map(p=>p.y);
+  let budIn=budPos.y, budOut=budPos.y;
+  const catIn=catPos.map(p=>p.y), catOut=catPos.map(p=>p.y);
+  // 1) Revenus → Budget
+  incomes.forEach((r,i)=>{const th=hOf(r.value);links+=band(colX[0]+nodeW,incOut[i],colX[1],budIn,th,'#6b91c4');budIn+=th;});
+  // 2) Budget → Catégories (puis Reste)
+  cats.forEach((c,j)=>{const th=hOf(c.value);links+=band(colX[1]+nodeW,budOut,colX[2],catIn[j],th,c.color);budOut+=th;});
+  if(reste>0){const th=hOf(reste);const j=cats.length;links+=band(colX[1]+nodeW,budOut,colX[2],catIn[j],th,'#555a66');budOut+=th;}
+  // 3) Catégories → Sous-postes
+  let itemIdx=0;
+  cats.forEach((c,j)=>{
+    c.items.forEach(it=>{
+      const th=hOf(it.value);const p=itemPos[itemIdx];
+      links+=band(colX[2]+nodeW,catOut[j],colX[3],p.y,th,c.color);
+      catOut[j]+=th;
+      nodes+=rect(colX[3],p,c.color);
+      labels+=pill(colX[3]-6,p.y+p.h/2,it.name+': '+eur(it.value),'end');
+      itemIdx++;
+    });
+  });
+  // ── Nœuds + labels des 3 premières colonnes ──
+  incomes.forEach((r,i)=>{nodes+=rect(colX[0],incPos[i],'#6b91c4');labels+=pill(colX[0]+nodeW+6,incPos[i].y+incPos[i].h/2,r.name+': '+eur(r.value),'start');});
+  nodes+=rect(colX[1],budPos,'#cf8f5c');labels+=pill(colX[1]+nodeW+6,budPos.y+budPos.h/2,'Budget: '+eur(T),'start');
+  cats.forEach((c,j)=>{nodes+=rect(colX[2],catPos[j],c.color);labels+=pill(colX[2]+nodeW+6,catPos[j].y+catPos[j].h/2,c.name+': '+eur(c.value),'start');});
+  if(reste>0){const j=cats.length;nodes+=rect(colX[2],catPos[j],'#555a66');labels+=pill(colX[2]+nodeW+6,catPos[j].y+catPos[j].h/2,'Reste disponible: '+eur(reste),'start');}
+  host.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="min-width:680px;display:block;" xmlns="http://www.w3.org/2000/svg">'+links+nodes+labels+'</svg>';
+}
+window.renderSankey=renderSankey;
+
+// ── Réglages Cashflow ──
+function openCfSettings(){const o=document.getElementById('cf-settings-overlay');if(o)o.style.display='flex';}
+function closeCfSettings(){const o=document.getElementById('cf-settings-overlay');if(o)o.style.display='none';}
+window.openCfSettings=openCfSettings;window.closeCfSettings=closeCfSettings;
+// Recharge le modèle d'exemple uniquement si la section est vide.
+function cfReseedTemplate(){
+  state._cfSeeded=false;save();
+  cfSeedIfEmpty();
+  renderCashflow();
+  closeCfSettings();
+  toast('Modèle rechargé');
+}
+window.cfReseedTemplate=cfReseedTemplate;
+// Efface toutes les données cashflow (après confirmation), sans toucher au DCA.
+async function cfResetData(){
+  if(!await confirmModal('Effacer toutes tes données Cashflow (revenus, investissements, dépenses) ? Ton outil DCA n\'est pas concerné.',{okText:'Effacer',danger:true}))return;
+  state.cashflow={income:[],invest:[],expense:[]};
+  state._cfSeeded=true; // on ne re-remplit pas le modèle après un effacement volontaire
+  save();renderCashflow();closeCfSettings();toast('Données Cashflow effacées');
+}
+window.cfResetData=cfResetData;
+
+
 
 // Réparation : neutraliser les références de début de mois (_monthPrice) corrompues
 // par d'anciennes manipulations (prix de test, 0, mauvaise devise) qui faussaient
@@ -298,6 +644,12 @@ window.toggleRealNetInfo=toggleRealNetInfo;
 //     plus récent que ce qu'il a déjà vu (jamais 10 pop-up à la suite).
 // ════════════════════════════════════════════════════════════════
 const CHANGELOG=[
+  {v:'1.53.0',d:'juin 2026',items:[
+    'Nouvelle section « Cashflow » : saisis tes revenus, tes investissements mensuels (par enveloppe) et tes dépenses (par catégorie, ex. Logement → Loyer + Charges), avec un modèle pré-rempli pour démarrer vite. Folia affiche ton reste disponible, ton taux d\'épargne, et un diagramme de flux qui montre visuellement où va ton argent.'
+  ]},
+  {v:'1.52.0',d:'juin 2026',items:[
+    'Folia devient une boîte à outils multi-sections ! Un écran d\'accueil te permet de choisir ton outil, et un sélecteur en haut à gauche te laisse basculer à tout moment. La section « DCA sur PEA » regroupe tout ce que tu connais déjà ; une section « Cashflow » (gestion des revenus et dépenses) arrive bientôt.'
+  ]},
   {v:'1.51.0',d:'juin 2026',items:[
     'Projection : nouveau curseur « Inflation » (3% par défaut). En plus de la valeur brute, la projection affiche désormais la « valeur réelle nette » — ce que ton capital vaudra vraiment en argent d\'aujourd\'hui, une fois l\'impôt PEA et l\'inflation pris en compte — avec sa courbe sur le graphique et une bulle ⓘ qui explique le calcul.'
   ]},
@@ -432,11 +784,14 @@ document.addEventListener('keydown',e=>{
 });
 document.getElementById('nav-date').textContent=new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
 function nav(id){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  // Ne toucher QUE les pages/onglets de la section DCA (sinon on désactive aussi
+  // la page du Cashflow, qui partage la classe .page → écran vide au retour).
+  const dca=document.getElementById('section-dca')||document;
+  dca.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  dca.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   const p=document.getElementById('page-'+id);
   if(p){void p.offsetWidth;p.classList.add('active');} // reflow → rejoue l'animation pageIn
-  document.querySelectorAll('.nav-tab').forEach(t=>{if(t.getAttribute('onclick')==="nav('"+id+"')")t.classList.add('active');});
+  dca.querySelectorAll('.nav-tab').forEach(t=>{if(t.getAttribute('onclick')==="nav('"+id+"')")t.classList.add('active');});
   if(id==='monthly')renderMonthly();
   if(id==='portfolio')renderEtfGrid();
   if(id==='history')renderHistory();
@@ -3103,15 +3458,22 @@ renderEtfGrid();
 renderMonthly();
 startAutoRefresh();
 refreshUndoBtn();
+// ── Choix de la section au démarrage ──
+// Nouvel utilisateur OU section jamais choisie → on montre le HUB d'accueil.
+// Sinon → on rouvre directement la dernière section utilisée.
+const _bootHub=(_isNewUser || !state._section);
+if(_bootHub){ showSection('hub'); }
+else { showSection(state._section); }
 // Lancement automatique de la visite guidée au tout premier usage
-// (portefeuille vide ET tuto jamais terminé/passé).
-if(!state._tourDone && (!state.etfs || state.etfs.length===0)){
+// (portefeuille vide ET tuto jamais terminé/passé) — mais PAS si on est sur le hub.
+if(!_bootHub && !state._tourDone && (!state.etfs || state.etfs.length===0)){
   setTimeout(()=>{ if(typeof startTour==='function' && (!state.etfs||state.etfs.length===0)) startTour(); }, 1400);
 }
 // "Quoi de neuf" pour les utilisateurs qui reviennent (jamais pour un nouveau,
-// ni par-dessus la visite guidée).
+// ni par-dessus la visite guidée, ni sur le hub).
 setTimeout(()=>{
-  try{ if(typeof tourActive==='function' && tourActive())return;
+  try{ if(_bootHub)return;
+       if(typeof tourActive==='function' && tourActive())return;
        maybeShowChangelog(_isNewUser); }catch(e){}
 }, _isNewUser?0:900);
 

@@ -19,8 +19,37 @@
     <div class="intro-line"></div>
   </div>
 </div>
+<!-- ══════════ HUB D'ACCUEIL (choix de section au 1er lancement) ══════════ -->
+<div id="hub" style="display:none;min-height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;padding:2rem;">
+  <div style="font-size:32px;font-weight:700;font-family:var(--display);letter-spacing:-.02em;margin-bottom:.4rem;">Folia<span style="color:var(--accent);">.</span></div>
+  <div style="font-size:13px;color:var(--text2);font-family:var(--mono);margin-bottom:2.5rem;text-align:center;max-width:420px;line-height:1.5;">Ta boîte à outils de gestion de patrimoine. Choisis par où commencer — tu pourras passer de l'une à l'autre à tout moment.</div>
+  <div style="display:flex;gap:1.25rem;flex-wrap:wrap;justify-content:center;max-width:640px;">
+    <button class="hub-card" onclick="showSection('dca')">
+      <div style="font-size:28px;margin-bottom:.6rem;">&#128200;</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:.35rem;">DCA sur PEA</div>
+      <div style="font-size:11px;color:var(--text2);font-family:var(--mono);line-height:1.5;">Planifie tes achats d'ETF mois après mois pour atteindre ta répartition cible.</div>
+    </button>
+    <button class="hub-card" onclick="showSection('cashflow')">
+      <div style="font-size:28px;margin-bottom:.6rem;">&#128176;</div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:.35rem;">Cashflow</div>
+      <div style="font-size:11px;color:var(--text2);font-family:var(--mono);line-height:1.5;">Visualise tes revenus, dépenses et ton taux d'épargne d'un coup d'œil.</div>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════ SECTION DCA (tout l'outil DCA existant, inchangé) ══════════ -->
+<div id="section-dca">
 <nav class="nav">
-  <div class="nav-logo">Folia<span>.</span></div>
+  <div class="nav-left">
+    <div class="nav-logo" onclick="showSection('hub')" title="Revenir à l'accueil">Folia<span>.</span></div>
+    <div class="tool-switch" onclick="toggleSectionMenu(event)">
+      <span class="tool-icon">&#128200;</span><span class="tool-name">DCA sur PEA</span><span class="tool-caret">▾</span>
+      <div class="section-menu" id="section-menu">
+        <button onclick="showSection('dca',event)">&#128200; DCA sur PEA</button>
+        <button onclick="showSection('cashflow',event)">&#128176; Cashflow</button>
+      </div>
+    </div>
+  </div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="nav('monthly')">Ce mois-ci</button>
     <button class="nav-tab" onclick="nav('portfolio')">Mon portefeuille</button>
@@ -237,6 +266,70 @@
     </div>
   </div>
 </div>
+</div><!-- /section-dca -->
+
+<!-- ══════════ SECTION CASHFLOW (placeholder — construite à l'étape 2) ══════════ -->
+<div id="section-cashflow" style="display:none;">
+  <nav class="nav">
+    <div class="nav-left">
+      <div class="nav-logo" onclick="showSection('hub')" title="Revenir à l'accueil">Folia<span>.</span></div>
+      <div class="tool-switch" onclick="toggleSectionMenu(event)">
+        <span class="tool-icon">&#128176;</span><span class="tool-name">Cashflow</span><span class="tool-caret">▾</span>
+        <div class="section-menu" id="section-menu-cf">
+          <button onclick="showSection('dca',event)">&#128200; DCA sur PEA</button>
+          <button onclick="showSection('cashflow',event)">&#128176; Cashflow</button>
+        </div>
+      </div>
+    </div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button onclick="openCfSettings()" style="background:transparent;border:1px solid var(--border);color:var(--text3);padding:5px 10px;font-size:13px;border-radius:var(--r);">&#9881; Paramètres</button>
+    </div>
+  </nav>
+  <!-- Bandeau de synthèse cashflow -->
+  <div class="health-bar" id="cf-health">
+    <div class="health-item"><div class="health-label">Revenus</div><div class="health-value blue" id="cf-hb-income">— €</div></div>
+    <div class="health-item"><div class="health-label">Investissements mensuels</div><div class="health-value" id="cf-hb-invest">— €</div></div>
+    <div class="health-item"><div class="health-label">Dépenses</div><div class="health-value" id="cf-hb-expenses">— €</div></div>
+    <div class="health-item"><div class="health-label">Reste disponible</div><div class="health-value" id="cf-hb-left">— €</div></div>
+    <div class="health-item"><div class="health-label">Taux d'épargne</div><div class="health-value" id="cf-hb-rate">—</div></div>
+  </div>
+
+  <div class="page active" id="page-cashflow">
+    <div class="cf-intro">
+      <div class="card-title" style="margin-bottom:.35rem;">Gestion de cashflow</div>
+      <div style="font-size:12px;color:var(--text2);font-family:var(--mono);line-height:1.55;">Saisis tes revenus, tes investissements et tes dépenses mensuels. Folia calcule ton reste disponible et ton taux d'épargne. <span style="color:var(--text3);">(Le diagramme de flux viendra ensuite.)</span></div>
+    </div>
+
+    <div class="cf-grid">
+      <!-- REVENUS (liste simple) -->
+      <div class="cf-col">
+        <div class="cf-col-head"><span class="cf-dot" style="background:var(--accent);"></span>Revenus<span class="cf-col-total" id="cf-total-income">0 €</span></div>
+        <div id="cf-list-income"></div>
+        <button class="cf-add" onclick="cfAddIncome()">+ Ajouter un revenu</button>
+      </div>
+      <!-- INVESTISSEMENTS MENSUELS (catégories → lignes) -->
+      <div class="cf-col">
+        <div class="cf-col-head"><span class="cf-dot" style="background:var(--green);"></span>Investissements mensuels<span class="cf-col-total" id="cf-total-invest">0 €</span></div>
+        <div id="cf-list-invest"></div>
+        <button class="cf-add" onclick="cfAddCat('invest')">+ Ajouter une enveloppe</button>
+      </div>
+      <!-- DÉPENSES (catégories → lignes) -->
+      <div class="cf-col">
+        <div class="cf-col-head"><span class="cf-dot" style="background:var(--amber);"></span>Dépenses<span class="cf-col-total" id="cf-total-expenses">0 €</span></div>
+        <div id="cf-list-expenses"></div>
+        <button class="cf-add" onclick="cfAddCat('expense')">+ Ajouter une catégorie</button>
+      </div>
+    </div>
+
+    <div class="cf-summary" id="cf-summary"></div>
+
+    <div class="card" id="cf-sankey-card" style="margin-top:1.25rem;">
+      <div class="card-title" style="margin-bottom:.85rem;">Diagramme de flux</div>
+      <div id="cf-sankey-wrap" style="overflow-x:auto;"><div id="cf-sankey"></div></div>
+    </div>
+  </div>
+</div>
 <!-- SETTINGS OVERLAY -->
 <div class="overlay" id="poscheck-overlay" style="display:none;" onclick="if(event.target===this)closePosCheck()">
   <div class="modal">
@@ -295,6 +388,20 @@
     </div>
   </div>
 </div>
+<!-- CASHFLOW SETTINGS OVERLAY -->
+<div class="overlay" id="cf-settings-overlay" style="display:none;" onclick="if(event.target===this)closeCfSettings()">
+  <div class="modal" style="max-width:440px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <div style="font-size:15px;font-weight:600;">&#9881; Paramètres — Cashflow</div>
+      <button onclick="closeCfSettings()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;cursor:pointer;">&times;</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.5;margin-bottom:1rem;">Réglages propres à la section Cashflow. Tes données (revenus, dépenses…) sont sauvegardées automatiquement dans ce navigateur, et incluses dans l'export/la synchro de Folia.</div>
+    <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="cfReseedTemplate()">&#8635; Recharger le modèle de départ</button>
+    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-bottom:1.2rem;">Remet les catégories d'exemple (Logement, Vie quotidienne…) si tu es parti de zéro. N'écrase rien si tu as déjà des données.</div>
+    <button onclick="cfResetData()" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--red);font-size:12px;padding:9px;border-radius:var(--r);width:100%;">&#9888; Effacer toutes les données Cashflow</button>
+    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-top:6px;">N'affecte pas ton outil DCA, qui a ses propres données.</div>
+  </div>
+</div>
 <!-- IMPORT OVERLAY -->
 <div class="overlay" id="import-modal" style="display:none;" onclick="if(event.target===this)closeImportModal()">
   <div class="modal">
@@ -310,7 +417,7 @@
     <button class="btn-ghost" style="width:100%;" onclick="goToManualEntry()">Ajouter mes ETF manuellement →</button>
   </div>
 </div>
-<footer>Folia · v1.51.1 · Planificateur DCA PEA · Données indicatives</footer>
+<footer>Folia · v1.53.0 · Boîte à outils patrimoine · Données indicatives</footer>
 <script src="app.js" defer></script>
 </body>
 </html>
