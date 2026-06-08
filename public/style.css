@@ -341,7 +341,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 .cf-col-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:.85rem;}
 .cf-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0;}
 .cf-col-total{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--text2);font-weight:600;}
-.cf-row{display:flex;gap:6px;margin-bottom:7px;align-items:center;}
+.cf-row{display:flex;gap:6px;margin-bottom:7px;align-items:center;flex-wrap:wrap;}
 .cf-row input.cf-name{flex:1;min-width:0;}
 .cf-row input.cf-amt{width:78px;text-align:right;}
 .cf-eur{font-size:11px;font-family:var(--mono);color:var(--text3);flex-shrink:0;width:14px;text-align:left;}
@@ -382,3 +382,94 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 @keyframes cfPulse{0%{box-shadow:0 0 0 0 rgba(79,142,247,0);}30%{box-shadow:0 0 0 3px rgba(79,142,247,.35);}100%{box-shadow:0 0 0 0 rgba(79,142,247,0);}}
 .cf-pulse{animation:cfPulse 1.2s ease;border-radius:var(--r2);}
 #cf-discover-target{scroll-margin-top:80px;border-radius:var(--r2);}
+
+/* Hub — bouton "Notes de mise à jour" ancré en bas, centré */
+#hub{position:relative;}
+.hub-changelog{position:absolute;bottom:1.6rem;left:50%;transform:translateX(-50%);background:transparent;border:1px solid var(--border);color:var(--text2);font-size:12px;font-family:var(--mono);padding:8px 16px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s ease,color .15s ease,background .15s ease;white-space:nowrap;}
+.hub-changelog:hover{border-color:var(--accent);color:var(--text);background:var(--bg3);}
+
+/* Cashflow — mode couple */
+.cf-couple{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:.85rem 1rem;margin-bottom:1rem;}
+.cf-couple-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.cf-couple-toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text);}
+.cf-couple-toggle input{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);}
+.cf-couple-sub{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.cf-couple-body{margin-top:.9rem;border-top:1px solid var(--border);padding-top:.9rem;display:flex;flex-direction:column;gap:.8rem;}
+.cf-couple-fields{display:flex;gap:.8rem;flex-wrap:wrap;}
+.cf-couple-field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:160px;}
+.cf-couple-field span{font-size:11px;color:var(--text2);font-family:var(--mono);}
+.cf-couple-field input{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--r);padding:8px 10px;font-size:14px;}
+.cf-couple-mode{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.cf-couple-modelabel{font-size:11px;color:var(--text2);font-family:var(--mono);}
+.cf-radio{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);cursor:pointer;}
+.cf-radio input{accent-color:var(--accent);cursor:pointer;}
+.cf-couple-pct input{width:58px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--r);padding:5px 8px;font-size:13px;text-align:center;}
+.cf-couple-pct{font-size:13px;color:var(--text2);}
+.cf-couple-info{font-size:12px;color:var(--text2);font-family:var(--mono);line-height:1.5;}
+.cf-couple-hint{font-size:11px;color:var(--text3);font-family:var(--mono);}
+
+/* Bouton "partager" (½) sur une ligne de dépense — visible seulement en mode couple */
+.cf-split{display:none;background:transparent;border:1px solid var(--border);color:var(--text3);width:30px;height:31px;border-radius:var(--r);cursor:pointer;flex-shrink:0;font-size:15px;line-height:1;align-items:center;justify-content:center;padding:0;}
+.cf-row.couple .cf-split{display:inline-flex;}
+.cf-split:hover{border-color:var(--purple);color:var(--purple);}
+.cf-split.on{border-color:var(--purple);color:var(--purple);background:rgba(167,139,250,.14);}
+.cf-share-note{font-size:10px;color:var(--purple);font-family:var(--mono);margin:-2px 0 2px 2px;opacity:.9;flex-basis:100%;width:100%;}
+/* bouton "partager toute la catégorie" dans l'en-tête (toujours visible en mode couple) */
+.cf-split-cat{display:inline-flex;width:26px;height:26px;font-size:13px;}
+
+/* ════════ Animations Cashflow (même DA que le DCA) ════════ */
+/* Survol des blocs : légère lévitation + ombre, comme les cartes ETF */
+.cf-col,.cf-couple,#cf-sankey-card{transition:border-color .2s,transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s ease;}
+.cf-col:hover,.cf-couple:hover,#cf-sankey-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 6px 20px -8px rgba(0,0,0,.5);}
+/* Les enveloppes/catégories réagissent aussi au survol */
+.cf-cat{transition:border-color .18s ease,transform .18s cubic-bezier(.22,1,.36,1),box-shadow .18s ease;}
+.cf-cat:hover{border-color:var(--border2);transform:translateY(-1px);box-shadow:0 4px 14px -8px rgba(0,0,0,.5);}
+/* Survol d'une ligne : léger fond + glissement */
+.cf-row{transition:transform .18s cubic-bezier(.22,1,.36,1);border-radius:var(--r);}
+.cf-cat-items .cf-row:hover,#cf-list-income .cf-row:hover{transform:translateX(2px);}
+
+/* Entrée à l'ouverture de la section (décalage en cascade) */
+@keyframes cfIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+#section-cashflow.cf-entering .cf-couple{animation:cfIn .34s cubic-bezier(.22,1,.36,1) both;}
+#section-cashflow.cf-entering .cf-col:nth-child(1){animation:cfIn .34s cubic-bezier(.22,1,.36,1) .05s both;}
+#section-cashflow.cf-entering .cf-col:nth-child(2){animation:cfIn .34s cubic-bezier(.22,1,.36,1) .12s both;}
+#section-cashflow.cf-entering .cf-col:nth-child(3){animation:cfIn .34s cubic-bezier(.22,1,.36,1) .19s both;}
+#section-cashflow.cf-entering #cf-discover-target{animation:cfIn .34s cubic-bezier(.22,1,.36,1) .26s both;}
+
+/* Pression tactile sur les boutons d'action */
+.cf-link,.cf-split,.cf-del,.cf-add,.cf-add-item,.cf-discover{transition:all .15s ease,transform .12s cubic-bezier(.34,1.56,.64,1);}
+.cf-link:active,.cf-split:active,.cf-del:active,.cf-add:active,.cf-add-item:active{transform:scale(.88);}
+/* Petit "pop" quand on (dé)active un lien ou un partage */
+@keyframes cfPop{0%{transform:scale(1);}40%{transform:scale(1.28);}100%{transform:scale(1);}}
+.cf-pop{animation:cfPop .34s cubic-bezier(.34,1.56,.64,1);}
+
+/* Apparition d'une nouvelle ligne / note de part */
+@keyframes cfRowIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+.cf-rowin{animation:cfRowIn .28s cubic-bezier(.22,1,.36,1) both;}
+.cf-share-note{animation:cfRowIn .24s ease both;}
+
+@media(prefers-reduced-motion:reduce){
+  .cf-col,.cf-couple,#cf-sankey-card,.cf-cat,.cf-row{transition:none;}
+  .cf-col:hover,.cf-couple:hover,#cf-sankey-card:hover,.cf-cat:hover{transform:none;}
+  #section-cashflow.cf-entering .cf-couple,#section-cashflow.cf-entering .cf-col,#section-cashflow.cf-entering #cf-discover-target{animation:none;}
+  .cf-pop,.cf-rowin,.cf-share-note{animation:none;}
+}
+
+/* ════════ Passe d'animations DCA (cohérente avec le Cashflow) ════════ */
+/* Retour tactile sur les boutons */
+.btn-add,.btn-ghost,.btn-primary,.btn-calc,.btn-confirm,.btn-refresh{transition:all .15s ease,transform .12s cubic-bezier(.34,1.56,.64,1);}
+.btn-add:active,.btn-ghost:active,.btn-primary:active,.btn-confirm:active,.btn-refresh:active{transform:scale(.95);}
+/* Survol des lignes du plan d'achat et de l'allocation */
+.order-row{transition:border-color .18s ease,transform .18s cubic-bezier(.22,1,.36,1),box-shadow .18s ease;}
+.order-row:hover{border-color:var(--border2);transform:translateX(3px);box-shadow:0 3px 12px -8px rgba(0,0,0,.5);}
+.alloc-item{transition:transform .16s cubic-bezier(.22,1,.36,1);border-radius:var(--r);}
+.alloc-item:hover{transform:translateX(2px);}
+/* Survol léger des tuiles de la barre de santé */
+.health-item{transition:transform .16s cubic-bezier(.22,1,.36,1);}
+.health-item:hover{transform:translateY(-1px);}
+
+@media(prefers-reduced-motion:reduce){
+  .btn-add:active,.btn-ghost:active,.btn-primary:active,.btn-confirm:active,.btn-refresh:active{transform:none;}
+  .order-row,.alloc-item,.health-item{transition:none;}
+  .order-row:hover,.alloc-item:hover,.health-item:hover{transform:none;}
+}

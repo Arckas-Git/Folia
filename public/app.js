@@ -99,6 +99,9 @@ function showSection(name,ev){
     // .active de cette page ; on la remet pour garantir l'affichage.
     const cfPage=document.getElementById('page-cashflow'); if(cfPage)cfPage.classList.add('active');
     try{ if(typeof cfSeedIfEmpty==='function')cfSeedIfEmpty(); if(typeof renderCashflow==='function')renderCashflow(); }catch(e){ console&&console.warn&&console.warn('Cashflow render:',e); }
+    // Entrée animée en cascade des blocs (rejouée à chaque ouverture de la section)
+    cf.classList.remove('cf-entering');void cf.offsetWidth;cf.classList.add('cf-entering');
+    setTimeout(()=>cf.classList.remove('cf-entering'),700);
   }
   else { dca.style.display='block'; state._section='dca'; save(); }
   closeSectionMenu();
@@ -152,13 +155,35 @@ function cfData(){
     arr=arr.map(cat=>(cat&&typeof cat==='object')
       ?{name:cat.name||'',items:(Array.isArray(cat.items)?cat.items:[]).map(it=>{
           const o={name:it.name||'',amount:Math.max(0,+it.amount||0)};
-          if(key==='invest'&&it.dca)o.dca=true; // lien avec l'épargne DCA (investissements uniquement)
+          if(key==='invest'&&it.dca)o.dca=true;   // lien avec l'épargne DCA (investissements)
+          if(key==='expense'&&it.split)o.split=true; // charge partagée en mode couple (dépenses)
           return o;
         })}
       :{name:'',items:[]});
     c[key]=arr;
   });
+  // Mode couple (répartition de certaines charges entre deux salaires)
+  const cp=(c.couple&&typeof c.couple==='object')?c.couple:{};
+  c.couple={
+    enabled:!!cp.enabled,
+    partnerName:cp.partnerName||'',
+    partnerIncome:Math.max(0,+cp.partnerIncome||0),
+    mode:(cp.mode==='percent')?'percent':'prorata',
+    percent:Math.min(100,Math.max(0,cp.percent!=null?+cp.percent:50))
+  };
   return c;
+}
+// Part de l'utilisateur (fraction 0..1) sur une charge partagée.
+function cfShare(){
+  const cp=cfData().couple;if(!cp.enabled)return 1;
+  if(cp.mode==='percent')return Math.min(1,Math.max(0,(+cp.percent||0)/100));
+  const me=cfSumIncome(),other=+cp.partnerIncome||0,tot=me+other; // pro-rata des salaires
+  return tot>0?me/tot:1;
+}
+// Montant réellement compté pour un item (part utilisateur si charge partagée).
+function cfEffAmount(kind,it){
+  if(kind==='expense'&&it&&it.split&&cfData().couple.enabled)return (+it.amount||0)*cfShare();
+  return (+it.amount||0);
 }
 
 // Détecte si un nom correspond à un PEA (pour lier à l'épargne DCA).
@@ -205,17 +230,17 @@ function cfSeedIfEmpty(){
 const _esc=s=>String(s||'').replace(/"/g,'&quot;');
 
 // ── Revenus (liste simple) ──
-function cfAddIncome(){const c=cfData();c.income.push({name:'',amount:0});save();renderCashflow();setTimeout(()=>{const l=document.getElementById('cf-list-income');if(l){const n=l.querySelectorAll('.cf-name');if(n.length)n[n.length-1].focus();}},30);}
-function cfDelIncome(i){const c=cfData();if(c.income[i]!==undefined){c.income.splice(i,1);save();renderCashflow();}}
+function cfAddIncome(){const c=cfData();pushUndo('ajout d\'un revenu');c.income.push({name:'',amount:0});save();renderCashflow();setTimeout(()=>{const l=document.getElementById('cf-list-income');if(l){const rows=l.querySelectorAll('.cf-row');const last=rows[rows.length-1];if(last)last.classList.add('cf-rowin');const n=l.querySelectorAll('.cf-name');if(n.length)n[n.length-1].focus();}},30);}
+function cfDelIncome(i){const c=cfData();if(c.income[i]!==undefined){pushUndo('suppression d\'un revenu');c.income.splice(i,1);save();renderCashflow();}}
 function cfSetIncome(i,field,val){const c=cfData();if(!c.income[i])return;if(field==='amount')c.income[i].amount=Math.max(0,+val||0);else c.income[i].name=val;save();cfUpdateTotals();}
 window.cfAddIncome=cfAddIncome;window.cfDelIncome=cfDelIncome;window.cfSetIncome=cfSetIncome;
 
 // ── Catégories (investissements & dépenses) ──
-function cfAddCat(kind){const c=cfData();c[kind].push({name:'',items:[{name:'',amount:0}]});save();renderCashflow();}
-function cfDelCat(kind,ci){const c=cfData();if(c[kind][ci]!==undefined){c[kind].splice(ci,1);save();renderCashflow();}}
+function cfAddCat(kind){const c=cfData();pushUndo('ajout d\'une catégorie');c[kind].push({name:'',items:[{name:'',amount:0}]});save();renderCashflow();}
+function cfDelCat(kind,ci){const c=cfData();if(c[kind][ci]!==undefined){pushUndo('suppression d\'une catégorie');c[kind].splice(ci,1);save();renderCashflow();}}
 function cfSetCat(kind,ci,val){const c=cfData();if(!c[kind][ci])return;c[kind][ci].name=val;save();cfUpdateTotals();}
-function cfAddItem(kind,ci){const c=cfData();if(!c[kind][ci])return;c[kind][ci].items.push({name:'',amount:0});save();renderCashflow();}
-function cfDelItem(kind,ci,ii){const c=cfData();if(c[kind][ci]&&c[kind][ci].items[ii]!==undefined){c[kind][ci].items.splice(ii,1);save();renderCashflow();}}
+function cfAddItem(kind,ci){const c=cfData();if(!c[kind][ci])return;pushUndo('ajout d\'une ligne');c[kind][ci].items.push({name:'',amount:0});save();renderCashflow();setTimeout(()=>{const list=document.getElementById(kind==='expense'?'cf-list-expenses':'cf-list-invest');if(list){const cats=list.querySelectorAll('.cf-cat');const cat=cats[ci];if(cat){const rows=cat.querySelectorAll('.cf-cat-items .cf-row');const last=rows[rows.length-1];if(last){last.classList.add('cf-rowin');const nm=last.querySelector('.cf-name');if(nm)nm.focus();}}}},30);}
+function cfDelItem(kind,ci,ii){const c=cfData();if(c[kind][ci]&&c[kind][ci].items[ii]!==undefined){pushUndo('suppression d\'une ligne');c[kind][ci].items.splice(ii,1);save();renderCashflow();}}
 function cfSetItem(kind,ci,ii,field,val,el){
   const c=cfData();if(!c[kind][ci]||!c[kind][ci].items[ii])return;
   const it=c[kind][ci].items[ii];
@@ -247,16 +272,84 @@ function cfUpdateInvestRow(row,it){
 // Active/désactive manuellement le lien d'une ligne d'investissement avec le DCA.
 function cfToggleDca(ci,ii){
   const c=cfData();const it=c.invest[ci]&&c.invest[ci].items[ii];if(!it)return;
+  pushUndo('lien DCA');
   if(it.dca){delete it.dca;} else {it.dca=true;it.amount=+state.monthly||0;}
-  save();renderCashflow();
+  save();renderCashflow();cfPop('cf-link-'+ci+'-'+ii);
 }
 window.cfToggleDca=cfToggleDca;
+
+// Petit "pop" visuel sur un bouton après (dé)activation.
+function cfPop(id){
+  const el=document.getElementById(id);if(!el)return;
+  el.classList.remove('cf-pop');void el.offsetWidth;el.classList.add('cf-pop');
+  setTimeout(()=>el.classList.remove('cf-pop'),360);
+}
+
+// ── Mode couple ──
+function cfSetCouple(field,val){
+  const c=cfData();
+  if(field==='enabled')c.couple.enabled=!!val;
+  else if(field==='partnerName')c.couple.partnerName=val;
+  else if(field==='partnerIncome')c.couple.partnerIncome=Math.max(0,+val||0);
+  else if(field==='mode')c.couple.mode=(val==='percent')?'percent':'prorata';
+  else if(field==='percent')c.couple.percent=Math.min(100,Math.max(0,+val||0));
+  save();
+}
+// Active/coupe le mode couple (reconstruit pour afficher/masquer les boutons « partager »).
+function cfToggleCouple(on){pushUndo('mode couple');cfSetCouple('enabled',on);renderCashflow();}
+// Change le mode de répartition (pro-rata / pourcentage).
+function cfSetCoupleMode(mode){cfSetCouple('mode',mode);renderCashflow();}
+// Texte d'info pro-rata (réutilisé pour la mise à jour en direct).
+function cfProRataText(cp){
+  const me=cfSumIncome(),other=+cp.partnerIncome||0,tot=me+other;
+  if(tot<=0)return 'Renseigne les deux salaires pour calculer le pro-rata.';
+  const myPct=Math.round(me/tot*100);
+  const who=cp.partnerName?_esc(cp.partnerName):'ton/ta conjoint·e';
+  return 'Au pro-rata, tu paies <strong style="color:var(--accent);">'+myPct+' %</strong> et '+who+' <strong>'+(100-myPct)+' %</strong> des charges partagées.';
+}
+// Saisie du salaire / nom / pourcentage du conjoint : recalcule SANS reconstruire le
+// panneau (garde le focus), en mettant à jour l'info pro-rata et les notes de part en place.
+function cfSetCoupleField(field,val){
+  cfSetCouple(field,val);
+  const cp=cfData().couple;
+  const info=document.getElementById('cf-couple-proinfo');
+  if(info){info.innerHTML=cfProRataText(cp);info.style.color=( (cfSumIncome()+(+cp.partnerIncome||0))>0 )?'':'var(--amber)';}
+  cfUpdateShareNotes();   // rafraîchit "ta part : X sur Y" sur chaque ligne partagée
+  cfUpdateTotals();
+  renderSankey();
+}
+// Met à jour en place les notes de part (sans reconstruire les lignes → focus préservé).
+function cfUpdateShareNotes(){
+  const share=cfShare();
+  document.querySelectorAll('#cf-list-expenses .cf-row.split .cf-share-note').forEach(note=>{
+    const amtEl=note.parentElement.querySelector('.cf-amt');const full=+ (amtEl?amtEl.value:0)||0;
+    note.textContent='ta part : '+Math.round(full*share).toLocaleString('fr-FR')+' € sur '+Math.round(full).toLocaleString('fr-FR')+' €';
+  });
+}
+// Marque/démarque une dépense comme partagée.
+function cfToggleSplit(ci,ii){
+  const c=cfData();const it=c.expense[ci]&&c.expense[ci].items[ii];if(!it)return;
+  pushUndo('partage d\'une charge');
+  if(it.split)delete it.split;else it.split=true;
+  save();renderCashflow();cfPop('cf-split-'+ci+'-'+ii);
+}
+// Partage (ou non) TOUTE une catégorie de dépenses d'un coup.
+function cfToggleSplitCat(ci){
+  const c=cfData();const cat=c.expense[ci];if(!cat||!cat.items.length)return;
+  pushUndo('partage d\'une catégorie');
+  const allSplit=cat.items.every(it=>it.split);
+  cat.items.forEach(it=>{ if(allSplit)delete it.split; else it.split=true; });
+  save();renderCashflow();cfPop('cf-splitcat-'+ci);
+}
+window.cfToggleSplitCat=cfToggleSplitCat;
+window.cfSetCouple=cfSetCouple;window.cfToggleCouple=cfToggleCouple;window.cfSetCoupleMode=cfSetCoupleMode;
+window.cfSetCoupleField=cfSetCoupleField;window.cfToggleSplit=cfToggleSplit;
 window.cfAddCat=cfAddCat;window.cfDelCat=cfDelCat;window.cfSetCat=cfSetCat;window.cfAddItem=cfAddItem;window.cfDelItem=cfDelItem;window.cfSetItem=cfSetItem;
 
 // ── Totaux ──
 function cfSumIncome(){return cfData().income.reduce((s,r)=>s+(+r.amount||0),0);}
-function cfCatTotal(cat){return (cat.items||[]).reduce((s,it)=>s+(+it.amount||0),0);}
-function cfSumCats(key){return cfData()[key].reduce((s,cat)=>s+cfCatTotal(cat),0);}
+function cfCatTotal(cat,kind){return (cat.items||[]).reduce((s,it)=>s+cfEffAmount(kind,it),0);}
+function cfSumCats(key){return cfData()[key].reduce((s,cat)=>s+cfCatTotal(cat,key),0);}
 
 function cfUpdateTotals(){
   const inc=cfSumIncome(),inv=cfSumCats('invest'),exp=cfSumCats('expense');
@@ -271,17 +364,29 @@ function cfUpdateTotals(){
   const leftEl=document.getElementById('cf-hb-left');if(leftEl)leftEl.style.color=left<0?'var(--red)':'var(--green)';
   // Totaux par catégorie (affichés dans chaque en-tête de catégorie)
   ['invest','expense'].forEach(key=>{
-    cfData()[key].forEach((cat,ci)=>{const e=document.getElementById('cf-cat-total-'+key+'-'+ci);if(e)e.textContent=fmt(cfCatTotal(cat));});
+    cfData()[key].forEach((cat,ci)=>{const e=document.getElementById('cf-cat-total-'+key+'-'+ci);if(e)e.textContent=fmt(cfCatTotal(cat,key));});
   });
   const sum=document.getElementById('cf-summary');
   if(sum){
     if(inc<=0){sum.innerHTML='<span style="color:var(--text3);font-family:var(--mono);font-size:12px;">Ajoute au moins un revenu pour voir ton taux d\'épargne.</span>';}
     else{
       const warn=left<0?'<div style="color:var(--red);font-size:12px;font-family:var(--mono);margin-top:6px;">⚠ Tes sorties dépassent tes revenus : tu puises dans tes réserves.</div>':'';
+      // Récapitulatif des charges partagées (mode couple)
+      let couple='';const cp=cfData().couple;
+      if(cp.enabled){
+        let full=0;cfData().expense.forEach(cat=>cat.items.forEach(it=>{if(it.split)full+=(+it.amount||0);}));
+        if(full>0){
+          const myShare=full*cfShare(),partner=full-myShare;
+          const who=cp.partnerName?_esc(cp.partnerName):'ton/ta conjoint·e';
+          const key=cp.mode==='percent'?('réparties à '+(+cp.percent||0)+' % / '+(100-(+cp.percent||0))+' %'):'réparties au pro-rata des salaires';
+          couple='<div style="margin-top:8px;font-size:12px;color:var(--text2);font-family:var(--mono);border-top:1px solid var(--border);padding-top:8px;">'
+            +'👫 Charges communes ('+fmt(full)+', '+key+') — ta part <strong style="color:var(--accent);">'+fmt(myShare)+'</strong> · part de '+who+' <strong>'+fmt(partner)+'</strong></div>';
+        }
+      }
       sum.innerHTML='Ton taux d\'épargne est de <strong style="color:var(--accent);">'+rate.toFixed(1)+' %</strong> '
         +'<span style="color:var(--text3);">(possible jusqu\'à '+possible.toFixed(1)+' %)</span>.<br>'
         +'Revenus <strong>'+fmt(inc)+'</strong> · investis <strong>'+fmt(inv)+'</strong> · dépenses <strong>'+fmt(exp)+'</strong> · '
-        +'reste disponible <strong style="color:'+(left<0?'var(--red)':'var(--green)')+';">'+fmt(left)+'</strong>.'+warn;
+        +'reste disponible <strong style="color:'+(left<0?'var(--red)':'var(--green)')+';">'+fmt(left)+'</strong>.'+warn+couple;
     }
   }
   // (Le tri et le diagramme se mettent à jour à la FIN de la frappe — voir cfOnCommit.)
@@ -291,6 +396,37 @@ function cfUpdateTotals(){
 // Petit suffixe "€" affiché à droite de chaque montant.
 const CF_EUR='<span class="cf-eur">€</span>';
 
+function cfRenderCouple(){
+  const host=document.getElementById('cf-couple');if(!host)return;
+  const cp=cfData().couple;
+  const head='<div class="cf-couple-head">'
+    +'<label class="cf-couple-toggle"><input type="checkbox" '+(cp.enabled?'checked':'')+' onchange="cfToggleCouple(this.checked)"/> <span>👫 Mode couple</span></label>'
+    +'<span class="cf-couple-sub">Répartis certaines charges entre deux salaires</span>'
+    +'</div>';
+  if(!cp.enabled){host.innerHTML=head;return;}
+  const me=cfSumIncome(),other=+cp.partnerIncome||0,tot=me+other;
+  const myPct=tot>0?Math.round(me/tot*100):50;
+  const proInfo=cp.mode==='prorata'
+    ? '<div class="cf-couple-info" id="cf-couple-proinfo">'+cfProRataText(cp)+'</div>'
+    : '';
+  const body='<div class="cf-couple-body">'
+    +'<div class="cf-couple-fields">'
+      +'<label class="cf-couple-field"><span>Prénom du conjoint·e</span><input type="text" placeholder="ex. Alex" value="'+_esc(cp.partnerName)+'" oninput="cfSetCoupleField(\'partnerName\',this.value)"/></label>'
+      +'<label class="cf-couple-field"><span>Son salaire net mensuel</span><input type="number" min="0" step="50" placeholder="0" value="'+(cp.partnerIncome||'')+'" oninput="cfSetCoupleField(\'partnerIncome\',this.value)"/></label>'
+    +'</div>'
+    +'<div class="cf-couple-mode">'
+      +'<span class="cf-couple-modelabel">Répartition :</span>'
+      +'<label class="cf-radio"><input type="radio" name="cf-split-mode" '+(cp.mode==='prorata'?'checked':'')+' onchange="cfSetCoupleMode(\'prorata\')"/> Pro-rata des salaires</label>'
+      +'<label class="cf-radio"><input type="radio" name="cf-split-mode" '+(cp.mode==='percent'?'checked':'')+' onchange="cfSetCoupleMode(\'percent\')"/> Pourcentage défini</label>'
+      +(cp.mode==='percent'
+        ? '<span class="cf-couple-pct">Ma part : <input type="number" min="0" max="100" step="5" value="'+(cp.percent)+'" oninput="cfSetCoupleField(\'percent\',this.value)"/> %</span>'
+        : '')
+    +'</div>'
+    +proInfo
+    +'<div class="cf-couple-hint">Clique sur le bouton ÷ d\'une ligne de dépense pour la marquer comme partagée.</div>'
+    +'</div>';
+  host.innerHTML=head+body;
+}
 function cfRenderIncome(){
   const list=document.getElementById('cf-list-income');if(!list)return;
   const arr=cfData().income;
@@ -307,29 +443,49 @@ function cfRenderCats(key){
   const list=document.getElementById(key==='expense'?'cf-list-expenses':'cf-list-invest');if(!list)return;
   const cats=cfData()[key];
   if(!cats.length){list.innerHTML='<div class="cf-empty">Aucune catégorie pour l\'instant.</div>';return;}
+  const coupleOn=cfData().couple.enabled;
+  const share=cfShare();
   list.innerHTML=cats.map((cat,ci)=>{
-    const items=(cat.items||[]).map((it,ii)=>{
+    const catItems=cat.items||[];
+    const items=catItems.map((it,ii)=>{
       const linked=(key==='invest'&&it.dca);
       const isPeaRow=(key==='invest'&&(it.dca||cfIsPea(it.name)));
+      const splitOn=(key==='expense'&&it.split);
       const amtAttrs=linked
         ? 'value="'+(+state.monthly||0)+'" readonly title="Montant synchronisé avec ton épargne mensuelle DCA" style="opacity:.75;cursor:not-allowed;"'
         : 'value="'+(it.amount||0)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'amount\',this.value)" onchange="cfOnCommit()"';
-      // Bouton lien : présent pour les investissements, mais visible seulement
-      // quand la ligne contient « PEA » (classe .pea sur la ligne, gérée en CSS).
+      // Bouton lien PEA : investissements, visible seulement si « PEA » (classe .pea).
       const linkBtn=(key==='invest')
-        ? '<button class="cf-link'+(linked?' on':'')+'" title="Lier / délier ce montant à ton épargne mensuelle DCA" onclick="cfToggleDca('+ci+','+ii+')">&#128279;</button>'
+        ? '<button id="cf-link-'+ci+'-'+ii+'" class="cf-link'+(linked?' on':'')+'" title="Lier / délier ce montant à ton épargne mensuelle DCA" onclick="cfToggleDca('+ci+','+ii+')">&#128279;</button>'
         : '';
-      return '<div class="cf-row'+(isPeaRow?' pea':'')+'">'
+      // Bouton "partager" : dépenses, visible seulement en mode couple (classe .couple).
+      const splitBtn=(key==='expense')
+        ? '<button id="cf-split-'+ci+'-'+ii+'" class="cf-split'+(splitOn?' on':'')+'" title="Partager cette charge avec ton/ta conjoint·e" onclick="cfToggleSplit('+ci+','+ii+')">&#247;</button>'
+        : '';
+      // Note de part : DANS la ligne (largeur pleine, passe à la ligne) pour qu'elle
+      // suive sa dépense lors du tri visuel (sinon elle resterait sous la mauvaise ligne).
+      const shareNote=(splitOn&&coupleOn)
+        ? '<div class="cf-share-note">ta part : '+Math.round((+it.amount||0)*share).toLocaleString('fr-FR')+' € sur '+Math.round(+it.amount||0).toLocaleString('fr-FR')+' €</div>'
+        : '';
+      const rowCls='cf-row'+(isPeaRow?' pea':'')+(splitOn?' split':'')+(coupleOn?' couple':'');
+      return '<div class="'+rowCls+'">'
         +'<input class="cf-name" type="text" placeholder="Nom" value="'+_esc(it.name)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'name\',this.value,this)" onchange="cfOnCommit()"/>'
-        +linkBtn
+        +linkBtn+splitBtn
         +'<input class="cf-amt" type="number" min="0" step="10" placeholder="0" '+amtAttrs+'/>'+CF_EUR
         +'<button class="cf-del" title="Supprimer" onclick="cfDelItem(\''+key+'\','+ci+','+ii+')">&times;</button>'
+        +shareNote
         +'</div>';
     }).join('');
+    // Bouton "partager toute la catégorie" : dépenses, en mode couple.
+    const allSplit=(key==='expense'&&catItems.length>0&&catItems.every(it=>it.split));
+    const catSplitBtn=(key==='expense'&&coupleOn)
+      ? '<button id="cf-splitcat-'+ci+'" class="cf-split cf-split-cat'+(allSplit?' on':'')+'" title="Partager toute la catégorie avec ton/ta conjoint·e" onclick="cfToggleSplitCat('+ci+')">&#247;</button>'
+      : '';
     return '<div class="cf-cat">'
       +'<div class="cf-cat-head">'
       +'<input class="cf-cat-name" type="text" placeholder="Nom de la catégorie" value="'+_esc(cat.name)+'" oninput="cfSetCat(\''+key+'\','+ci+',this.value)" onchange="cfOnCommit()"/>'
       +'<span class="cf-cat-total" id="cf-cat-total-'+key+'-'+ci+'">0 €</span>'
+      +catSplitBtn
       +'<button class="cf-del cf-del-cat" title="Supprimer la catégorie" onclick="cfDelCat(\''+key+'\','+ci+')">&times;</button>'
       +'</div>'
       +'<div class="cf-cat-items">'+items+'</div>'
@@ -339,24 +495,44 @@ function cfRenderCats(key){
 }
 // Réordonne VISUELLEMENT (ordre flexbox) par montant DÉCROISSANT, sans toucher
 // au HTML — donc utilisable en direct pendant la saisie sans perdre le focus.
-function cfReorderList(container,childSel){
+// Si animate=true, on anime le glissement des lignes vers leur nouvelle place (FLIP).
+function cfReorderList(container,childSel,animate){
   if(!container)return;
   const els=[...container.querySelectorAll(':scope > '+childSel)];
+  if(!els.length)return;
   const amt=el=>{let s=0;el.querySelectorAll('.cf-amt').forEach(i=>s+=(+i.value||0));return s;};
+  // FLIP — First : mémoriser la position actuelle de chaque élément
+  const first=animate?els.map(el=>el.getBoundingClientRect().top):null;
+  // appliquer le nouvel ordre
   els.map(el=>({el,a:amt(el)})).sort((x,y)=>y.a-x.a).forEach((o,rank)=>{o.el.style.order=rank;});
+  if(!animate)return;
+  // Last + Invert + Play : on inverse le déplacement puis on le laisse revenir à 0
+  els.forEach((el,i)=>{
+    const dy=first[i]-el.getBoundingClientRect().top;
+    if(Math.abs(dy)>1){
+      el.style.transition='none';
+      el.style.transform='translateY('+dy+'px)';
+      requestAnimationFrame(()=>{
+        el.style.transition='transform .34s cubic-bezier(.22,1,.36,1)';
+        el.style.transform='';
+        setTimeout(()=>{el.style.transition='';el.style.transform='';},360);
+      });
+    }
+  });
 }
-function cfReorder(){
-  cfReorderList(document.getElementById('cf-list-income'),'.cf-row');
+function cfReorder(animate){
+  cfReorderList(document.getElementById('cf-list-income'),'.cf-row',animate);
   ['invest','expense'].forEach(key=>{
     const list=document.getElementById(key==='expense'?'cf-list-expenses':'cf-list-invest');
     if(!list)return;
-    cfReorderList(list,'.cf-cat'); // catégories entre elles (par total)
-    list.querySelectorAll('.cf-cat-items').forEach(items=>cfReorderList(items,'.cf-row')); // lignes dans chaque catégorie
+    cfReorderList(list,'.cf-cat',animate); // catégories entre elles (par total)
+    list.querySelectorAll('.cf-cat-items').forEach(items=>cfReorderList(items,'.cf-row',animate)); // lignes dans chaque catégorie
   });
 }
 function renderCashflow(){
   cfData();
   cfSyncDcaLinks();   // aligne les lignes liées sur l'épargne DCA actuelle
+  cfRenderCouple();
   cfRenderIncome();
   cfRenderCats('invest');
   cfRenderCats('expense');
@@ -369,7 +545,7 @@ window.renderCashflow=renderCashflow;
 // c'est là qu'on réordonne et qu'on met à jour le diagramme, pour ne pas
 // perturber la saisie en cours.
 function cfOnCommit(){
-  if(typeof cfReorder==='function')cfReorder();
+  if(typeof cfReorder==='function')cfReorder(true); // anime le tri à la fin de la frappe
   if(typeof renderSankey==='function')renderSankey();
 }
 window.cfOnCommit=cfOnCommit;
@@ -387,39 +563,44 @@ function renderSankey(){
   // Palette volontairement désaturée (tons doux) pour rester lisible sur fond sombre.
   const palette=['#5fa98c','#9b90c0','#cf9a5f','#5faaa0','#6f97c4','#c182a3','#cc8585','#ccae6f','#8a8fbf','#c8946f'];
   let ci=0;const cats=[];
-  const pushCats=(list,fallback)=>{(list||[]).forEach(c=>{
-    const items=(c.items||[]).filter(it=>(+it.amount||0)>0).map(it=>({name:it.name||'—',value:+it.amount}));
+  const pushCats=(list,fallback,kind)=>{(list||[]).forEach(c=>{
+    const items=(c.items||[]).map(it=>({name:it.name||'—',value:cfEffAmount(kind,it)})).filter(it=>it.value>0);
     const tot=items.reduce((s,it)=>s+it.value,0);
     if(tot>0){const col=palette[ci%palette.length];ci++;cats.push({name:c.name||fallback,value:tot,color:col,items});}
   });};
-  pushCats(d.invest,'Investissement');
-  pushCats(d.expense,'Dépense');
+  pushCats(d.invest,'Investissement','invest');
+  pushCats(d.expense,'Dépense','expense');
   const allocated=cats.reduce((s,c)=>s+c.value,0);
   const reste=Math.max(0,T-allocated);
   // ── Géométrie ──
-  const W=900,nodeW=13,G=13;
+  const W=900,nodeW=13,G=12,PAD=12,MINH=4;
   const colX=[6,250,500,W-nodeW-6]; // x gauche de chaque colonne
-  const n0=incomes.length,n2=cats.length+(reste>0?1:0),n3=cats.reduce((s,c)=>s+c.items.length,0);
-  const maxNodes=Math.max(n0,1,n2,n3,1);
-  const H=Math.max(320,maxNodes*40);
-  // échelle : on prend la plus petite qui fait tenir chaque colonne
-  const colSums=[T,T,T,allocated];
-  const colN=[n0,1,n2,Math.max(n3,1)];
-  let scale=Infinity;
-  for(let k=0;k<4;k++){if(colSums[k]>0){const s=(H-(colN[k]-1)*G)/colSums[k];if(s<scale)scale=s;}}
-  if(!isFinite(scale)||scale<=0)scale=0.1;
-  const hOf=v=>Math.max(2,v*scale);
-  // placement vertical d'une colonne (centrée) → liste de {y,h}
-  function place(values){
-    const hs=values.map(hOf);const total=hs.reduce((a,b)=>a+b,0)+(values.length-1)*G;
-    let y=(H-total)/2;const out=[];for(let i=0;i<values.length;i++){out.push({y,h:hs[i]});y+=hs[i]+G;}return out;
-  }
-  const incPos=place(incomes.map(r=>r.value));
-  const budPos=place([T])[0];
+  const n2=cats.length+(reste>0?1:0),n3=cats.reduce((s,c)=>s+c.items.length,0);
+  // Échelle proportionnelle : la plus grande colonne (somme T) occupe ~VHEIGHT px.
+  const VHEIGHT=340;
+  let scale=T>0?VHEIGHT/T:0.1;
+  const hOf=v=>Math.max(MINH,v*scale); // plancher pour que les petites lignes restent visibles
+  // Hauteurs par colonne
+  const incH=incomes.map(r=>hOf(r.value));
+  const budH=[hOf(T)];
   const cat2vals=cats.map(c=>c.value).concat(reste>0?[reste]:[]);
-  const catPos=place(cat2vals);
+  const catH=cat2vals.map(hOf);
   const itemVals=[];cats.forEach(c=>c.items.forEach(it=>itemVals.push(it.value)));
-  const itemPos=itemVals.length?place(itemVals):[];
+  const itemH=itemVals.map(hOf);
+  const colTotal=arr=>arr.reduce((a,b)=>a+b,0)+Math.max(0,arr.length-1)*G;
+  // La hauteur de contenu = la colonne la plus haute (planchers + espacements inclus).
+  // On en DÉDUIT H (au lieu de la fixer d'avance), donc plus aucune coupe en bas.
+  const contentH=Math.max(colTotal(incH),colTotal(budH),colTotal(catH),colTotal(itemH),120);
+  const H=Math.round(contentH+2*PAD);
+  // placement vertical d'une colonne, centrée dans la zone de contenu [PAD, PAD+contentH]
+  function place(hs){
+    const total=hs.reduce((a,b)=>a+b,0)+Math.max(0,hs.length-1)*G;
+    let y=PAD+(contentH-total)/2;const out=[];for(let i=0;i<hs.length;i++){out.push({y,h:hs[i]});y+=hs[i]+G;}return out;
+  }
+  const incPos=place(incH);
+  const budPos=place(budH)[0];
+  const catPos=place(catH);
+  const itemPos=itemH.length?place(itemH):[];
   // ── Helpers SVG ──
   const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const eur=v=>Math.round(v).toLocaleString('fr-FR')+' €';
@@ -464,7 +645,7 @@ function renderSankey(){
   nodes+=rect(colX[1],budPos,'#cf8f5c');labels+=pill(colX[1]+nodeW+6,budPos.y+budPos.h/2,'Budget: '+eur(T),'start');
   cats.forEach((c,j)=>{nodes+=rect(colX[2],catPos[j],c.color);labels+=pill(colX[2]+nodeW+6,catPos[j].y+catPos[j].h/2,c.name+': '+eur(c.value),'start');});
   if(reste>0){const j=cats.length;nodes+=rect(colX[2],catPos[j],'#555a66');labels+=pill(colX[2]+nodeW+6,catPos[j].y+catPos[j].h/2,'Reste disponible: '+eur(reste),'start');}
-  host.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" style="display:block;max-width:100%;height:auto;" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">'+links+nodes+labels+'</svg>';
+  host.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;height:auto;min-width:560px;" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">'+links+nodes+labels+'</svg>';
 }
 window.renderSankey=renderSankey;
 
@@ -492,6 +673,7 @@ async function cfReseedTemplate(){
   if(hasData){
     if(!await confirmModal('Remplacer ta saisie actuelle par le modèle d\'exemple (Logement, Vie quotidienne…) ?',{okText:'Charger le modèle'}))return;
   }
+  pushUndo('chargement du modèle d\'exemple');
   state.cashflow={income:[],invest:[],expense:[]};
   state._cfSeeded=false;        // autorise le pré-remplissage…
   cfSeedIfEmpty();              // …qui repose le modèle d'exemple
@@ -503,6 +685,7 @@ window.cfReseedTemplate=cfReseedTemplate;
 // Efface toutes les données cashflow (après confirmation), sans toucher au DCA.
 async function cfResetData(){
   if(!await confirmModal('Effacer toutes tes données Cashflow (revenus, investissements, dépenses) ? Ton outil DCA n\'est pas concerné.',{okText:'Effacer',danger:true}))return;
+  pushUndo('effacement du Cashflow');
   state.cashflow={income:[],invest:[],expense:[]};
   state._cfSeeded=true; // on ne re-remplit pas le modèle après un effacement volontaire
   save();renderCashflow();closeCfSettings();toast('Données Cashflow effacées');
@@ -555,6 +738,7 @@ function doUndo(){
     uiMode=state.uiMode||'simple';
     save();
     renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();
+    if(typeof renderCashflow==='function')renderCashflow();
     const pp=document.getElementById('page-projection');if(pp&&pp.classList.contains('active'))updateProj();
     toast('Annulé : '+entry.label);
   }catch(e){toast('Échec de l\'annulation');}
@@ -572,6 +756,7 @@ function doRedo(){
     uiMode=state.uiMode||'simple';
     save();
     renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();
+    if(typeof renderCashflow==='function')renderCashflow();
     const pp=document.getElementById('page-projection');if(pp&&pp.classList.contains('active'))updateProj();
     toast('Rétabli : '+entry.label);
   }catch(e){toast('Échec du rétablissement');}
@@ -734,25 +919,41 @@ window.toggleRealNetInfo=toggleRealNetInfo;
 //     plus récent que ce qu'il a déjà vu (jamais 10 pop-up à la suite).
 // ════════════════════════════════════════════════════════════════
 const CHANGELOG=[
-  {v:'1.55.1',d:'juin 2026',items:[
-    'Cashflow : un bouton « Découvrir mon cashflow » t\'amène directement à ton taux d\'épargne et à ton diagramme de flux, d\'un défilement fluide — sans scroller jusqu\'en bas.'
+  {v:'1.56.2',d:'8 juin 2026',items:[
+    'Mêmes petites animations soignées sur l\'outil DCA : entrée en cascade des cartes au changement d\'onglet, survol des lignes du plan d\'achat et de l\'allocation, apparition animée d\'un nouvel ETF, et retour tactile sur les boutons.',
+    'Ctrl+Z fonctionne maintenant aussi pour les modifications de montants et de noms dans le Cashflow, même quand le curseur est dans un champ.',
+    'Correction du clignotement de la carte lors de l\'ajout d\'un ETF (apparition propre).'
   ]},
-  {v:'1.55.0',d:'juin 2026',items:[
+  {v:'1.56.1',d:'8 juin 2026',items:[
+    'Cashflow plus vivant : entrée animée des blocs à l\'ouverture, effet de survol sur les colonnes et catégories, glissement fluide des lignes lors du tri, et petit « pop » sur les boutons lien (🔗) et partage (÷).'
+  ]},
+  {v:'1.56.0',d:'8 juin 2026',items:[
+    'Nouveau mode couple dans le Cashflow : renseigne le salaire de ton/ta conjoint·e, puis marque certaines dépenses comme « partagées » (bouton ÷) — ligne par ligne ou une catégorie entière d\'un coup. Folia ne compte alors que ta part, soit au pro-rata des deux salaires (celui qui gagne plus paie plus), soit selon un pourcentage que tu choisis.',
+    'L\'annulation (Ctrl+Z) et le rétablissement (Ctrl+Y) fonctionnent désormais aussi pour le Cashflow (ajouts, suppressions, partages…).'
+  ]},
+  {v:'1.55.2',d:'8 juin 2026',items:[
+    'Un bouton « Notes de mise à jour » en bas de l\'écran d\'accueil : clique dessus à tout moment pour revoir toutes les nouveautés, des grosses fonctionnalités aux petits ajustements.'
+  ]},
+  {v:'1.55.1',d:'8 juin 2026',items:[
+    'Cashflow : un bouton « Découvrir mon cashflow » t\'amène directement à ton taux d\'épargne et à ton diagramme de flux, d\'un défilement fluide — sans scroller jusqu\'en bas.',
+    'Le diagramme de flux s\'agrandit désormais correctement quand tu ajoutes beaucoup de lignes (plus de coupe en bas).'
+  ]},
+  {v:'1.55.0',d:'8 juin 2026',items:[
     'Les deux outils communiquent : dans le Cashflow, nomme une ligne d\'investissement « PEA » et son montant se synchronise automatiquement avec ton épargne mensuelle du DCA. Si tu changes ce montant dans le DCA, il se met à jour ici aussi. Un bouton 🔗 permet de détacher le lien pour saisir un montant libre.'
   ]},
-  {v:'1.54.0',d:'juin 2026',items:[
+  {v:'1.54.0',d:'8 juin 2026',items:[
     'Gestion des données unifiée entre DCA et Cashflow : mêmes options (transfert vers un autre appareil par code, export/import fichier) dans les deux sections. À l\'import, tu choisis ce que tu reprends — DCA seulement, Cashflow seulement, ou les deux. Le code de transfert et le fichier emportent l\'ensemble de Folia.'
   ]},
-  {v:'1.53.0',d:'juin 2026',items:[
+  {v:'1.53.0',d:'7 juin 2026',items:[
     'Nouvelle section « Cashflow » : saisis tes revenus, tes investissements mensuels (par enveloppe) et tes dépenses (par catégorie, ex. Logement → Loyer + Charges), avec un modèle pré-rempli pour démarrer vite. Folia affiche ton reste disponible, ton taux d\'épargne, et un diagramme de flux qui montre visuellement où va ton argent.'
   ]},
-  {v:'1.52.0',d:'juin 2026',items:[
+  {v:'1.52.0',d:'7 juin 2026',items:[
     'Folia devient une boîte à outils multi-sections ! Un écran d\'accueil te permet de choisir ton outil, et un sélecteur en haut à gauche te laisse basculer à tout moment. La section « DCA sur PEA » regroupe tout ce que tu connais déjà ; une section « Cashflow » (gestion des revenus et dépenses) arrive bientôt.'
   ]},
-  {v:'1.51.0',d:'juin 2026',items:[
+  {v:'1.51.0',d:'6 juin 2026',items:[
     'Projection : nouveau curseur « Inflation » (3% par défaut). En plus de la valeur brute, la projection affiche désormais la « valeur réelle nette » — ce que ton capital vaudra vraiment en argent d\'aujourd\'hui, une fois l\'impôt PEA et l\'inflation pris en compte — avec sa courbe sur le graphique et une bulle ⓘ qui explique le calcul.'
   ]},
-  {v:'1.50.0',d:'juin 2026',items:[
+  {v:'1.50.0',d:'6 juin 2026',items:[
     '✨ Cette fenêtre « Quoi de neuf » : tu verras les nouveautés à chaque retour sur le site.',
     'Synchronisation entre appareils : transfère tes données mobile ↔ PC avec un simple code, sans fichier.',
     'Affichage mobile entièrement repensé : navigation, portefeuille et tutoriel adaptés au téléphone.',
@@ -794,18 +995,25 @@ function maybeShowChangelog(isNewUser){
   showChangelogModal(toShow);
 }
 
-// Affiche le pop-up regroupant une ou plusieurs entrées.
+// Affiche le pop-up. Les entrées du même jour sont regroupées sous une seule date.
 function showChangelogModal(entries){
   const ov=document.createElement('div');ov.className='overlay';ov.style.zIndex='9998';
   const box=document.createElement('div');box.className='modal';box.style.maxWidth='440px';
+  // Regroupement par jour (les entrées sont déjà triées de la plus récente à la plus ancienne)
+  const groups=[];
+  entries.forEach(e=>{
+    const last=groups[groups.length-1];
+    if(last&&last.d===e.d){ last.items=last.items.concat(e.items); }
+    else groups.push({d:e.d,items:e.items.slice()});
+  });
   let h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem;">'
     +'<div style="font-size:15px;font-weight:600;">&#10024; Quoi de neuf</div>'
     +'<button id="cl-close" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;cursor:pointer;">&#215;</button></div>';
-  entries.forEach(e=>{
-    h+='<div style="margin-top:.6rem;">'
-      +'<div style="font-size:11px;font-family:var(--mono);color:var(--accent);margin-bottom:6px;">v'+e.v+(e.d?' · '+e.d:'')+'</div>'
+  groups.forEach(g=>{
+    h+='<div style="margin-top:.7rem;">'
+      +(g.d?'<div style="font-size:11px;font-family:var(--mono);color:var(--accent);margin-bottom:6px;">'+g.d+'</div>':'')
       +'<ul style="margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:5px;">';
-    e.items.forEach(it=>{ h+='<li style="font-size:12px;color:var(--text2);line-height:1.45;">'+it+'</li>'; });
+    g.items.forEach(it=>{ h+='<li style="font-size:12px;color:var(--text2);line-height:1.45;">'+it+'</li>'; });
     h+='</ul></div>';
   });
   h+='<button id="cl-ok" class="btn-add" style="width:100%;margin-top:1rem;">Super, merci !</button>';
@@ -818,6 +1026,10 @@ function showChangelogModal(entries){
   box.querySelector('#cl-close').onclick=close;
   box.querySelector('#cl-ok').onclick=close;
 }
+// Ouvre les notes de mise à jour à la demande (tout l'historique), sans modifier
+// l'état "_seenChangelog" : c'est une consultation manuelle, pas le pop-up auto.
+function openChangelog(){ if(CHANGELOG&&CHANGELOG.length)showChangelogModal(CHANGELOG); }
+window.openChangelog=openChangelog;
 window.maybeShowChangelog=maybeShowChangelog;
 // Replie/déplie un bloc (Projection par ETF, Performances, Fiscalité).
 // L'état ouvert/fermé est mémorisé dans le state pour rester comme l'utilisateur l'a laissé.
@@ -864,23 +1076,41 @@ function applyCollapseState(){
   });
 }
 window.applyCollapseState=applyCollapseState;
-// Raccourci clavier Ctrl+Z (et Cmd+Z sur Mac)
+// Raccourci clavier Ctrl+Z / Ctrl+Y (et Cmd sur Mac)
 document.addEventListener('keydown',e=>{
+  const mod=e.ctrlKey||e.metaKey;if(!mod)return;
+  const k=e.key.toLowerCase();
+  const isUndo=(k==='z'&&!e.shiftKey);
+  const isRedo=(k==='y'||(k==='z'&&e.shiftKey));
+  if(!isUndo&&!isRedo)return;
   const t=document.activeElement;
   const inField=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable);
-  if(inField)return; // laisser le comportement natif des champs (annulation de saisie)
-  const mod=e.ctrlKey||e.metaKey;
-  if(!mod)return;
-  const k=e.key.toLowerCase();
-  // Rétablir : Ctrl+Y  OU  Ctrl+Shift+Z (standard Mac)
-  if(k==='y'||(k==='z'&&e.shiftKey)){
-    e.preventDefault();doRedo();return;
+  if(inField){
+    const cfSec=document.getElementById('section-cashflow');
+    const inCf=cfSec&&cfSec.style.display!=='none'&&cfSec.contains(t);
+    if(!inCf)return; // hors Cashflow : on laisse l'annulation native du champ
+    if(t.blur)t.blur(); // dans le Cashflow : valider la saisie (capture le snapshot) puis annuler
   }
-  // Annuler : Ctrl+Z (sans Shift)
-  if(k==='z'&&!e.shiftKey){
-    e.preventDefault();doUndo();return;
-  }
+  e.preventDefault();
+  if(isRedo)doRedo();else doUndo();
 });
+// Annulation des modifications de champs du Cashflow : on mémorise l'état à l'entrée
+// dans un champ, et on l'empile dans la pile d'annulation si la valeur a changé à la sortie.
+let _cfEditSnap=null;
+function cfCommitEditSnapshot(){
+  if(_cfEditSnap==null)return;
+  if(_cfEditSnap!==JSON.stringify(state)){
+    _undoStack.push({snap:_cfEditSnap,label:'modification du Cashflow'});
+    if(_undoStack.length>_UNDO_MAX)_undoStack.shift();
+    _redoStack.length=0;if(typeof refreshUndoBtn==='function')refreshUndoBtn();
+  }
+  _cfEditSnap=null;
+}
+(function(){
+  const cfSec=document.getElementById('section-cashflow');if(!cfSec)return;
+  cfSec.addEventListener('focusin',e=>{if(e.target&&e.target.matches&&e.target.matches('input,textarea'))_cfEditSnap=JSON.stringify(state);});
+  cfSec.addEventListener('focusout',e=>{if(e.target&&e.target.matches&&e.target.matches('input,textarea'))cfCommitEditSnapshot();});
+})();
 document.getElementById('nav-date').textContent=new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long'});
 function nav(id){
   // Ne toucher QUE les pages/onglets de la section DCA (sinon on désactive aussi
@@ -889,7 +1119,16 @@ function nav(id){
   dca.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   dca.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
   const p=document.getElementById('page-'+id);
-  if(p){void p.offsetWidth;p.classList.add('active');} // reflow → rejoue l'animation pageIn
+  if(p){
+    void p.offsetWidth;p.classList.add('active'); // reflow → rejoue l'animation pageIn
+    // Cascade d'entrée des blocs (cohérent avec le Cashflow), en réutilisant blockIn.
+    const blocks=[...p.querySelectorAll('.plan-card,.update-card,.card,.onboarding,.etf-card')].filter(b=>b.offsetParent!==null);
+    blocks.forEach((b,i)=>{
+      b.style.animation='none';void b.offsetWidth;
+      b.style.animation='blockIn .34s cubic-bezier(.22,1,.36,1) '+Math.min(0.04+i*0.05,0.4).toFixed(2)+'s both';
+    });
+    setTimeout(()=>blocks.forEach(b=>{b.style.animation='';}),1000);
+  }
   dca.querySelectorAll('.nav-tab').forEach(t=>{if(t.getAttribute('onclick')==="nav('"+id+"')")t.classList.add('active');});
   if(id==='monthly')renderMonthly();
   if(id==='portfolio')renderEtfGrid();
@@ -1349,6 +1588,7 @@ function addEtfBlankAndScroll(){
   pushUndo('ajout d\'un ETF');
   const id=state.nextId++;
   state.etfs.push({id,name:'',ticker:'',isin:'',target:0,shares:0,avgPrice:0});
+  _newEtfId=id;             // la carte s'animera dès sa création (pas de clignotement)
   save();renderEtfGrid();
   setTimeout(()=>{
     const card=document.getElementById('etf-card-'+id);
@@ -1429,6 +1669,7 @@ function onIdentInputById(eid,val){
 window.setEtfField=setEtfField;
 window.onIdentInputById=onIdentInputById;
 let dragSrcIdx=null;
+let _newEtfId=null; // id de l'ETF tout juste ajouté → animation d'apparition à la création
 function renderEtfGrid(){
   const grid=document.getElementById('etf-grid');grid.innerHTML='';
   // Tri par allocation cible décroissante (sans modifier state.etfs)
@@ -1437,6 +1678,7 @@ function renderEtfGrid(){
     const eid=etf.id;
     const color=COLORS[i%COLORS.length];const card=document.createElement('div');
     card.className='etf-card';card.id='etf-card-'+eid;card.setAttribute('draggable','true');
+    if(_newEtfId===eid)card.classList.add('block-in'); // apparition animée, sans clignotement
     card.addEventListener('mousedown',e=>{if(e.target.tagName==='INPUT'||e.target.closest('button')||e.target.closest('a'))card.setAttribute('draggable','false');});
     card.addEventListener('mouseup',()=>card.setAttribute('draggable','true'));
     card.addEventListener('dragstart',e=>{dragSrcIdx=i;card.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
@@ -1539,6 +1781,7 @@ function renderEtfGrid(){
       +'</div>';
     card.innerHTML=body;grid.appendChild(card);
   });
+  _newEtfId=null; // marqueur consommé
   refreshAllocTotal();
 }
 let _sortTimer=null;
@@ -2525,7 +2768,12 @@ function showImportScopeModal(incoming,hasDca,hasCf){
       try{
         const ok=applyImportedScoped(incoming,scope);
         _dataIoStatus(ok?'✓ Import réussi':'✕ Rien à importer pour ce périmètre',ok?'var(--green)':'var(--red)');
-        if(ok&&typeof toast==='function')toast('Import réussi');
+        if(ok){
+          if(typeof toast==='function')toast('Import réussi');
+          // Refermer les panneaux de paramètres une fois l'import effectué.
+          if(typeof closeSettings==='function')closeSettings();
+          if(typeof closeCfSettings==='function')closeCfSettings();
+        }
       }catch(err){_dataIoStatus('✕ Échec de l\'import','var(--red)');}
     };
   });
