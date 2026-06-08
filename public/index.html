@@ -322,11 +322,17 @@
       </div>
     </div>
 
-    <div class="cf-summary" id="cf-summary"></div>
+    <div style="text-align:center;margin:1.1rem 0;">
+      <button class="cf-discover" onclick="cfScrollToDiagram()">Découvrir mon cashflow <span style="font-size:14px;">&#8595;</span></button>
+    </div>
 
-    <div class="card" id="cf-sankey-card" style="margin-top:1.25rem;">
-      <div class="card-title" style="margin-bottom:.85rem;">Diagramme de flux</div>
-      <div id="cf-sankey-wrap" style="overflow-x:auto;"><div id="cf-sankey"></div></div>
+    <div id="cf-discover-target">
+      <div class="cf-summary" id="cf-summary"></div>
+
+      <div class="card" id="cf-sankey-card" style="margin-top:1.25rem;">
+        <div class="card-title" style="margin-bottom:.85rem;">Diagramme de flux</div>
+        <div id="cf-sankey-wrap" style="overflow-x:auto;"><div id="cf-sankey"></div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -363,12 +369,12 @@
       <div style="border:1px solid var(--border);border-radius:var(--r2);padding:.9rem 1rem;margin:.6rem 0 .75rem;">
         <div class="info-row" style="margin-bottom:9px;"><span style="font-size:12px;font-weight:600;color:var(--text);">&#128241; Transférer vers un autre appareil</span><span class="info-ic" onclick="toggleInfo(this)">i</span></div>
         <div class="info-tip">Rapide, sans fichier (ex. mobile → PC). Le code expire après 30 jours et tes données transitent par le serveur.</div>
-        <button id="sync-save-btn" class="btn-primary" style="width:100%;margin-bottom:9px;" onclick="syncSave()">&#9729; Générer un code</button>
+        <button id="sync-save-btn" class="btn-primary" style="width:100%;margin-bottom:9px;" onclick="syncSave('dca')">&#9729; Générer un code</button>
         <div id="sync-code-output" style="margin-bottom:12px;"></div>
         <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:6px;">Reçu un code sur l'autre appareil ? Saisis-le ici :</div>
         <div style="display:flex;gap:6px;margin-bottom:6px;">
-          <input type="text" id="sync-code-input" placeholder="ABC123" maxlength="8" style="flex:1;text-transform:uppercase;letter-spacing:.1em;font-size:15px;text-align:center;" oninput="this.value=this.value.toUpperCase()"/>
-          <button id="sync-load-btn" class="btn-ghost" onclick="syncLoad()">Récupérer</button>
+          <input type="text" id="sync-code-input" maxlength="8" style="flex:1;text-transform:uppercase;letter-spacing:.1em;font-size:15px;text-align:center;" oninput="this.value=this.value.toUpperCase()"/>
+          <button id="sync-load-btn" class="btn-ghost" onclick="syncLoad('dca')">Récupérer</button>
         </div>
         <div id="sync-load-output" style="min-height:14px;"></div>
       </div>
@@ -379,7 +385,7 @@
         <div class="info-tip">Un fichier conservé chez toi, sans expiration ni serveur. Ton filet de sécurité avant un changement d'appareil ou un gros remaniement.</div>
         <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="exportData()">&#11015; Exporter dans un fichier</button>
         <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="document.getElementById('import-data-file').click()">&#11014; Importer un fichier</button>
-        <input type="file" id="import-data-file" accept="application/json,.json" style="display:none;" onchange="importData(this.files[0])"/>
+        <input type="file" id="import-data-file" accept="application/json,.json" style="display:none;" onchange="importDataScoped(this.files[0])"/>
         <div id="data-io-status" style="font-size:11px;font-family:var(--mono);min-height:14px;"></div>
       </div>
 
@@ -390,16 +396,54 @@
 </div>
 <!-- CASHFLOW SETTINGS OVERLAY -->
 <div class="overlay" id="cf-settings-overlay" style="display:none;" onclick="if(event.target===this)closeCfSettings()">
-  <div class="modal" style="max-width:440px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+  <div class="modal" style="max-width:420px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem;">
       <div style="font-size:15px;font-weight:600;">&#9881; Paramètres — Cashflow</div>
       <button onclick="closeCfSettings()" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;cursor:pointer;">&times;</button>
     </div>
-    <div style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.5;margin-bottom:1rem;">Réglages propres à la section Cashflow. Tes données (revenus, dépenses…) sont sauvegardées automatiquement dans ce navigateur, et incluses dans l'export/la synchro de Folia.</div>
-    <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="cfReseedTemplate()">&#8635; Recharger le modèle de départ</button>
-    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-bottom:1.2rem;">Remet les catégories d'exemple (Logement, Vie quotidienne…) si tu es parti de zéro. N'écrase rien si tu as déjà des données.</div>
-    <button onclick="cfResetData()" style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--red);font-size:12px;padding:9px;border-radius:var(--r);width:100%;">&#9888; Effacer toutes les données Cashflow</button>
-    <div style="font-size:10px;color:var(--text3);font-family:var(--mono);line-height:1.45;margin-top:6px;">N'affecte pas ton outil DCA, qui a ses propres données.</div>
+
+    <!-- Contenu propre à la section Cashflow -->
+    <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;">Contenu de la section</div>
+    <div class="info-row" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+      <button class="btn-ghost" style="flex:1;text-align:left;" onclick="cfReseedTemplate()">&#128221; Charger le modèle d'exemple</button>
+      <span class="info-ic" onclick="toggleInfo(this)">i</span>
+    </div>
+    <div class="info-tip">Remplit la section avec des catégories d'exemple prêtes à remplir (Logement, Vie quotidienne, Abonnements…). Pratique pour démarrer. Te demande confirmation si tu as déjà des données.</div>
+
+    <div class="info-row" style="display:flex;align-items:center;gap:8px;margin:14px 0 6px;">
+      <button style="flex:1;text-align:left;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--red);font-size:13px;padding:9px 11px;border-radius:var(--r);cursor:pointer;" onclick="cfResetData()">&#128465; Tout effacer (repartir à vide)</button>
+      <span class="info-ic" onclick="toggleInfo(this)">i</span>
+    </div>
+    <div class="info-tip">Vide complètement la section : plus aucune ligne. À l'inverse de « Charger le modèle », qui lui la remplit. Ton outil DCA n'est pas touché.</div>
+
+    <!-- Mes données — MÊME structure que le DCA (transfert + sauvegarde fichier) -->
+    <div style="border-top:1px solid var(--border);margin-top:1.2rem;padding-top:1rem;">
+      <div class="info-row" style="margin-bottom:.4rem;"><span style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;">Mes données</span><span class="info-ic" onclick="toggleInfo(this)">i</span></div>
+      <div class="info-tip">Le transfert et la sauvegarde concernent <strong>l'ensemble de Folia</strong> (DCA + Cashflow) : un seul code, un seul fichier pour tout. À l'import, tu pourras choisir de ne reprendre qu'une partie.</div>
+
+      <!-- Sous-bloc 1 : transfert rapide entre appareils (code) -->
+      <div style="border:1px solid var(--border);border-radius:var(--r2);padding:.9rem 1rem;margin:.6rem 0 .75rem;">
+        <div class="info-row" style="margin-bottom:9px;"><span style="font-size:12px;font-weight:600;color:var(--text);">&#128241; Transférer vers un autre appareil</span><span class="info-ic" onclick="toggleInfo(this)">i</span></div>
+        <div class="info-tip">Rapide, sans fichier (ex. mobile → PC). Emporte toutes tes données Folia. Le code expire après 30 jours et tes données transitent par le serveur.</div>
+        <button id="sync-save-btn-cf" class="btn-primary" style="width:100%;margin-bottom:9px;" onclick="syncSave('cf')">&#9729; Générer un code</button>
+        <div id="sync-code-output-cf" style="margin-bottom:12px;"></div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:6px;">Reçu un code sur l'autre appareil ? Saisis-le ici :</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <input type="text" id="sync-code-input-cf" maxlength="8" style="flex:1;text-transform:uppercase;letter-spacing:.1em;font-size:15px;text-align:center;" oninput="this.value=this.value.toUpperCase()"/>
+          <button id="sync-load-btn-cf" class="btn-ghost" onclick="syncLoad('cf')">Récupérer</button>
+        </div>
+        <div id="sync-load-output-cf" style="min-height:14px;"></div>
+      </div>
+
+      <!-- Sous-bloc 2 : sauvegarde durable (fichier) -->
+      <div style="border:1px solid var(--border);border-radius:var(--r2);padding:.9rem 1rem;">
+        <div class="info-row" style="margin-bottom:9px;"><span style="font-size:12px;font-weight:600;color:var(--text);">&#128190; Sauvegarde durable (fichier)</span><span class="info-ic" onclick="toggleInfo(this)">i</span></div>
+        <div class="info-tip">Un fichier conservé chez toi, sans expiration ni serveur. À l'import, tu choisis ce que tu reprends : DCA, Cashflow, ou les deux.</div>
+        <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="exportData()">&#11015; Exporter dans un fichier</button>
+        <button class="btn-ghost" style="width:100%;margin-bottom:8px;" onclick="document.getElementById('cf-import-file').click()">&#11014; Importer un fichier</button>
+        <input type="file" id="cf-import-file" accept="application/json,.json" style="display:none;" onchange="importDataScoped(this.files[0])"/>
+      </div>
+    </div>
   </div>
 </div>
 <!-- IMPORT OVERLAY -->
@@ -417,7 +461,7 @@
     <button class="btn-ghost" style="width:100%;" onclick="goToManualEntry()">Ajouter mes ETF manuellement →</button>
   </div>
 </div>
-<footer>Folia · v1.53.0 · Boîte à outils patrimoine · Données indicatives</footer>
+<footer>Folia · v1.55.1 · Boîte à outils patrimoine · Données indicatives</footer>
 <script src="app.js" defer></script>
 </body>
 </html>

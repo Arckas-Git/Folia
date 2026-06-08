@@ -150,12 +150,35 @@ function cfData(){
     }
     // Normalisation des catégories
     arr=arr.map(cat=>(cat&&typeof cat==='object')
-      ?{name:cat.name||'',items:(Array.isArray(cat.items)?cat.items:[]).map(it=>({name:it.name||'',amount:Math.max(0,+it.amount||0)}))}
+      ?{name:cat.name||'',items:(Array.isArray(cat.items)?cat.items:[]).map(it=>{
+          const o={name:it.name||'',amount:Math.max(0,+it.amount||0)};
+          if(key==='invest'&&it.dca)o.dca=true; // lien avec l'épargne DCA (investissements uniquement)
+          return o;
+        })}
       :{name:'',items:[]});
     c[key]=arr;
   });
   return c;
 }
+
+// Détecte si un nom correspond à un PEA (pour lier à l'épargne DCA).
+function cfIsPea(name){return /\bpea\b/i.test(String(name||''));}
+// Force le montant des lignes d'investissement liées au DCA = épargne mensuelle DCA.
+// Renvoie true si au moins une ligne liée a été trouvée (pour décider d'un re-render).
+function cfSyncDcaLinks(){
+  const c=cfData();let found=false;const m=+state.monthly||0;
+  c.invest.forEach(cat=>cat.items.forEach(it=>{ if(it.dca){it.amount=m;found=true;} }));
+  return found;
+}
+// Appelé quand l'épargne mensuelle DCA change : met à jour le Cashflow s'il est concerné.
+function cfOnDcaMonthlyChange(){
+  if(cfSyncDcaLinks()){
+    save();
+    const cf=document.getElementById('section-cashflow');
+    if(cf&&cf.style.display!=='none'&&typeof renderCashflow==='function')renderCashflow();
+  }
+}
+window.cfOnDcaMonthlyChange=cfOnDcaMonthlyChange;
 
 // Pré-remplit un modèle de départ la 1re fois que la section est vide.
 // Un drapeau (_cfSeeded) évite de re-remplir si l'utilisateur a tout effacé volontairement.
@@ -193,7 +216,41 @@ function cfDelCat(kind,ci){const c=cfData();if(c[kind][ci]!==undefined){c[kind].
 function cfSetCat(kind,ci,val){const c=cfData();if(!c[kind][ci])return;c[kind][ci].name=val;save();cfUpdateTotals();}
 function cfAddItem(kind,ci){const c=cfData();if(!c[kind][ci])return;c[kind][ci].items.push({name:'',amount:0});save();renderCashflow();}
 function cfDelItem(kind,ci,ii){const c=cfData();if(c[kind][ci]&&c[kind][ci].items[ii]!==undefined){c[kind][ci].items.splice(ii,1);save();renderCashflow();}}
-function cfSetItem(kind,ci,ii,field,val){const c=cfData();if(!c[kind][ci]||!c[kind][ci].items[ii])return;if(field==='amount')c[kind][ci].items[ii].amount=Math.max(0,+val||0);else c[kind][ci].items[ii].name=val;save();cfUpdateTotals();}
+function cfSetItem(kind,ci,ii,field,val,el){
+  const c=cfData();if(!c[kind][ci]||!c[kind][ci].items[ii])return;
+  const it=c[kind][ci].items[ii];
+  if(field==='amount'){it.amount=Math.max(0,+val||0);save();cfUpdateTotals();return;}
+  // field === 'name'
+  it.name=val;
+  if(kind==='invest'){
+    // Détection « PEA » → lien avec l'épargne DCA (sans reconstruire la liste,
+    // pour ne pas perdre le focus : on met à jour seulement la ligne concernée).
+    if(cfIsPea(val)){ if(it.dca===undefined){it.dca=true;it.amount=+state.monthly||0;} }
+    else { if(it.dca)delete it.dca; }
+    const row=el&&el.closest?el.closest('.cf-row'):null;
+    if(row)cfUpdateInvestRow(row,it);
+  }
+  save();cfUpdateTotals();
+}
+// Met à jour en place l'apparence d'une ligne d'investissement (bouton lien visible
+// seulement si PEA, verrouillage du montant si lié) — sans recréer les champs.
+function cfUpdateInvestRow(row,it){
+  const isPea=!!(it.dca||cfIsPea(it.name));
+  row.classList.toggle('pea',isPea);
+  const link=row.querySelector('.cf-link');if(link)link.classList.toggle('on',!!it.dca);
+  const amt=row.querySelector('.cf-amt');
+  if(amt){
+    if(it.dca){amt.value=(+state.monthly||0);amt.readOnly=true;amt.style.opacity='.75';amt.style.cursor='not-allowed';}
+    else{amt.readOnly=false;amt.style.opacity='';amt.style.cursor='';}
+  }
+}
+// Active/désactive manuellement le lien d'une ligne d'investissement avec le DCA.
+function cfToggleDca(ci,ii){
+  const c=cfData();const it=c.invest[ci]&&c.invest[ci].items[ii];if(!it)return;
+  if(it.dca){delete it.dca;} else {it.dca=true;it.amount=+state.monthly||0;}
+  save();renderCashflow();
+}
+window.cfToggleDca=cfToggleDca;
 window.cfAddCat=cfAddCat;window.cfDelCat=cfDelCat;window.cfSetCat=cfSetCat;window.cfAddItem=cfAddItem;window.cfDelItem=cfDelItem;window.cfSetItem=cfSetItem;
 
 // ── Totaux ──
@@ -251,11 +308,24 @@ function cfRenderCats(key){
   const cats=cfData()[key];
   if(!cats.length){list.innerHTML='<div class="cf-empty">Aucune catégorie pour l\'instant.</div>';return;}
   list.innerHTML=cats.map((cat,ci)=>{
-    const items=(cat.items||[]).map((it,ii)=>'<div class="cf-row">'
-      +'<input class="cf-name" type="text" placeholder="Nom" value="'+_esc(it.name)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'name\',this.value)" onchange="cfOnCommit()"/>'
-      +'<input class="cf-amt" type="number" min="0" step="10" placeholder="0" value="'+(it.amount||0)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'amount\',this.value)" onchange="cfOnCommit()"/>'+CF_EUR
-      +'<button class="cf-del" title="Supprimer" onclick="cfDelItem(\''+key+'\','+ci+','+ii+')">&times;</button>'
-      +'</div>').join('');
+    const items=(cat.items||[]).map((it,ii)=>{
+      const linked=(key==='invest'&&it.dca);
+      const isPeaRow=(key==='invest'&&(it.dca||cfIsPea(it.name)));
+      const amtAttrs=linked
+        ? 'value="'+(+state.monthly||0)+'" readonly title="Montant synchronisé avec ton épargne mensuelle DCA" style="opacity:.75;cursor:not-allowed;"'
+        : 'value="'+(it.amount||0)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'amount\',this.value)" onchange="cfOnCommit()"';
+      // Bouton lien : présent pour les investissements, mais visible seulement
+      // quand la ligne contient « PEA » (classe .pea sur la ligne, gérée en CSS).
+      const linkBtn=(key==='invest')
+        ? '<button class="cf-link'+(linked?' on':'')+'" title="Lier / délier ce montant à ton épargne mensuelle DCA" onclick="cfToggleDca('+ci+','+ii+')">&#128279;</button>'
+        : '';
+      return '<div class="cf-row'+(isPeaRow?' pea':'')+'">'
+        +'<input class="cf-name" type="text" placeholder="Nom" value="'+_esc(it.name)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'name\',this.value,this)" onchange="cfOnCommit()"/>'
+        +linkBtn
+        +'<input class="cf-amt" type="number" min="0" step="10" placeholder="0" '+amtAttrs+'/>'+CF_EUR
+        +'<button class="cf-del" title="Supprimer" onclick="cfDelItem(\''+key+'\','+ci+','+ii+')">&times;</button>'
+        +'</div>';
+    }).join('');
     return '<div class="cf-cat">'
       +'<div class="cf-cat-head">'
       +'<input class="cf-cat-name" type="text" placeholder="Nom de la catégorie" value="'+_esc(cat.name)+'" oninput="cfSetCat(\''+key+'\','+ci+',this.value)" onchange="cfOnCommit()"/>'
@@ -286,6 +356,7 @@ function cfReorder(){
 }
 function renderCashflow(){
   cfData();
+  cfSyncDcaLinks();   // aligne les lignes liées sur l'épargne DCA actuelle
   cfRenderIncome();
   cfRenderCats('invest');
   cfRenderCats('expense');
@@ -393,21 +464,40 @@ function renderSankey(){
   nodes+=rect(colX[1],budPos,'#cf8f5c');labels+=pill(colX[1]+nodeW+6,budPos.y+budPos.h/2,'Budget: '+eur(T),'start');
   cats.forEach((c,j)=>{nodes+=rect(colX[2],catPos[j],c.color);labels+=pill(colX[2]+nodeW+6,catPos[j].y+catPos[j].h/2,c.name+': '+eur(c.value),'start');});
   if(reste>0){const j=cats.length;nodes+=rect(colX[2],catPos[j],'#555a66');labels+=pill(colX[2]+nodeW+6,catPos[j].y+catPos[j].h/2,'Reste disponible: '+eur(reste),'start');}
-  host.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="min-width:680px;display:block;" xmlns="http://www.w3.org/2000/svg">'+links+nodes+labels+'</svg>';
+  host.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" style="display:block;max-width:100%;height:auto;" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">'+links+nodes+labels+'</svg>';
 }
 window.renderSankey=renderSankey;
+
+// Centre la vue sur la zone « épargne + diagramme » (défilement doux) + mise en valeur.
+function cfScrollToDiagram(){
+  const target=document.getElementById('cf-discover-target')||document.getElementById('cf-sankey-card');
+  if(!target)return;
+  target.scrollIntoView({behavior:'smooth',block:'center'});
+  target.classList.remove('cf-pulse');
+  void target.offsetWidth;            // reflow → rejoue l'animation
+  target.classList.add('cf-pulse');
+  setTimeout(()=>target.classList.remove('cf-pulse'),1300);
+}
+window.cfScrollToDiagram=cfScrollToDiagram;
 
 // ── Réglages Cashflow ──
 function openCfSettings(){const o=document.getElementById('cf-settings-overlay');if(o)o.style.display='flex';}
 function closeCfSettings(){const o=document.getElementById('cf-settings-overlay');if(o)o.style.display='none';}
 window.openCfSettings=openCfSettings;window.closeCfSettings=closeCfSettings;
-// Recharge le modèle d'exemple uniquement si la section est vide.
-function cfReseedTemplate(){
-  state._cfSeeded=false;save();
-  cfSeedIfEmpty();
+// Charge le modèle d'exemple (remplit la section). Demande confirmation si des
+// données existent déjà, pour ne pas écraser par accident.
+async function cfReseedTemplate(){
+  const c=cfData();
+  const hasData=(c.income.length||c.invest.length||c.expense.length);
+  if(hasData){
+    if(!await confirmModal('Remplacer ta saisie actuelle par le modèle d\'exemple (Logement, Vie quotidienne…) ?',{okText:'Charger le modèle'}))return;
+  }
+  state.cashflow={income:[],invest:[],expense:[]};
+  state._cfSeeded=false;        // autorise le pré-remplissage…
+  cfSeedIfEmpty();              // …qui repose le modèle d'exemple
   renderCashflow();
   closeCfSettings();
-  toast('Modèle rechargé');
+  toast('Modèle d\'exemple chargé');
 }
 window.cfReseedTemplate=cfReseedTemplate;
 // Efface toutes les données cashflow (après confirmation), sans toucher au DCA.
@@ -644,6 +734,15 @@ window.toggleRealNetInfo=toggleRealNetInfo;
 //     plus récent que ce qu'il a déjà vu (jamais 10 pop-up à la suite).
 // ════════════════════════════════════════════════════════════════
 const CHANGELOG=[
+  {v:'1.55.1',d:'juin 2026',items:[
+    'Cashflow : un bouton « Découvrir mon cashflow » t\'amène directement à ton taux d\'épargne et à ton diagramme de flux, d\'un défilement fluide — sans scroller jusqu\'en bas.'
+  ]},
+  {v:'1.55.0',d:'juin 2026',items:[
+    'Les deux outils communiquent : dans le Cashflow, nomme une ligne d\'investissement « PEA » et son montant se synchronise automatiquement avec ton épargne mensuelle du DCA. Si tu changes ce montant dans le DCA, il se met à jour ici aussi. Un bouton 🔗 permet de détacher le lien pour saisir un montant libre.'
+  ]},
+  {v:'1.54.0',d:'juin 2026',items:[
+    'Gestion des données unifiée entre DCA et Cashflow : mêmes options (transfert vers un autre appareil par code, export/import fichier) dans les deux sections. À l\'import, tu choisis ce que tu reprends — DCA seulement, Cashflow seulement, ou les deux. Le code de transfert et le fichier emportent l\'ensemble de Folia.'
+  ]},
   {v:'1.53.0',d:'juin 2026',items:[
     'Nouvelle section « Cashflow » : saisis tes revenus, tes investissements mensuels (par enveloppe) et tes dépenses (par catégorie, ex. Logement → Loyer + Charges), avec un modèle pré-rempli pour démarrer vite. Folia affiche ton reste disponible, ton taux d\'épargne, et un diagramme de flux qui montre visuellement où va ton argent.'
   ]},
@@ -2338,12 +2437,107 @@ function importData(file){
   reader.readAsText(file,'utf-8');
 }
 
+// ── Import avec choix du périmètre (DCA / Cashflow / les deux) ──
+// Clés appartenant au Cashflow ; tout le reste = DCA.
+const CF_KEYS=['cashflow','_cfSeeded'];
+// Applique un state importé en ne touchant qu'au périmètre choisi.
+function applyImportedScoped(incoming,scope){
+  if(!incoming||typeof incoming!=='object')return false;
+  if(scope==='both'){return applyImportedState(incoming);} // remplace tout (exige etfs)
+  if(scope==='cashflow'){
+    if(!incoming.cashflow||typeof incoming.cashflow!=='object')return false;
+    state.cashflow=JSON.parse(JSON.stringify(incoming.cashflow));
+    if(incoming._cfSeeded!=null)state._cfSeeded=incoming._cfSeeded; else state._cfSeeded=true;
+    save();
+    if(typeof renderCashflow==='function')renderCashflow();
+    return true;
+  }
+  if(scope==='dca'){
+    if(!Array.isArray(incoming.etfs))return false;
+    // On copie toutes les clés SAUF celles du Cashflow (qu'on préserve)
+    const fresh=JSON.parse(JSON.stringify(DEFAULT_STATE));
+    const merged=Object.assign(fresh,incoming);
+    CF_KEYS.forEach(k=>{ if(k in state)merged[k]=state[k]; else delete merged[k]; });
+    Object.keys(state).forEach(k=>{ if(!CF_KEYS.includes(k))delete state[k]; });
+    Object.keys(merged).forEach(k=>{ if(!CF_KEYS.includes(k))state[k]=merged[k]; });
+    uiMode=state.uiMode||'simple';save();
+    // Re-render DCA
+    document.getElementById('monthly').value=state.monthly;
+    document.getElementById('freq').value=state.freq||'monthly';
+    document.getElementById('fee-per-order').value=state.feePerOrder!=null?state.feePerOrder:1;
+    document.getElementById('reminder-day').value=state.reminderDay||1;
+    document.getElementById('drift-alert').value=state.driftAlert||8;
+    if(typeof renderDayPicker==='function')renderDayPicker();
+    renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();updateProj();
+    startAutoRefresh();
+    return true;
+  }
+  return false;
+}
+
+// Lit un fichier, détecte ce qu'il contient, puis demande le périmètre à importer.
+function importDataScoped(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    let parsed=null;
+    try{parsed=JSON.parse(e.target.result);}catch(_){_dataIoStatus('✕ Fichier illisible (JSON invalide)','var(--red)');return;}
+    const incoming=(parsed&&parsed.type==='folia-backup'&&parsed.state)?parsed.state:parsed;
+    if(!incoming||typeof incoming!=='object'){_dataIoStatus('✕ Ce fichier n\'est pas une sauvegarde Folia valide','var(--red)');return;}
+    const hasDca=Array.isArray(incoming.etfs);
+    const hasCf=incoming.cashflow&&typeof incoming.cashflow==='object'
+      &&((incoming.cashflow.income||[]).length||(incoming.cashflow.invest||[]).length||(incoming.cashflow.expense||[]).length);
+    if(!hasDca&&!hasCf){_dataIoStatus('✕ Aucune donnée Folia reconnue dans ce fichier','var(--red)');return;}
+    showImportScopeModal(incoming,!!hasDca,!!hasCf);
+  };
+  reader.onerror=()=>_dataIoStatus('✕ Impossible de lire le fichier','var(--red)');
+  reader.readAsText(file,'utf-8');
+}
+window.importDataScoped=importDataScoped;
+
+// Petite fenêtre de choix du périmètre d'import.
+function showImportScopeModal(incoming,hasDca,hasCf){
+  const ov=document.createElement('div');ov.className='overlay';ov.style.display='flex';ov.style.zIndex='9997';
+  const box=document.createElement('div');box.className='modal';box.style.maxWidth='400px';
+  const btn=(scope,label,enabled)=>enabled
+    ? '<button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;" data-scope="'+scope+'">'+label+'</button>'
+    : '<button class="btn-ghost" style="width:100%;margin-bottom:8px;text-align:left;opacity:.4;cursor:not-allowed;" disabled>'+label+' <span style="font-size:10px;">(absent du fichier)</span></button>';
+  box.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">'
+    +'<div style="font-size:15px;font-weight:600;">Importer — que veux-tu reprendre ?</div></div>'
+    +'<div style="font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.5;margin-bottom:1rem;">Seul le périmètre choisi sera remplacé ; le reste de tes données est conservé.</div>'
+    +btn('dca','&#128200; Données DCA seulement',hasDca)
+    +btn('cashflow','&#128176; Données Cashflow seulement',hasCf)
+    +btn('both','&#128260; Les deux (remplace tout)',hasDca)
+    +'<button id="imp-cancel" style="width:100%;background:transparent;border:1px solid var(--border);color:var(--text2);padding:9px;border-radius:var(--r);margin-top:4px;cursor:pointer;">Annuler</button>';
+  ov.appendChild(box);document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  ov.addEventListener('click',ev=>{if(ev.target===ov)close();});
+  box.querySelector('#imp-cancel').onclick=close;
+  box.querySelectorAll('button[data-scope]').forEach(b=>{
+    b.onclick=async()=>{
+      const scope=b.getAttribute('data-scope');
+      close();
+      const msg=scope==='both'?'Importer et remplacer TOUTES tes données (DCA + Cashflow) ?'
+        :scope==='dca'?'Importer les données DCA ? Seul ton DCA sera remplacé.'
+        :'Importer les données Cashflow ? Seul ton Cashflow sera remplacé.';
+      if(!await confirmModal(msg,{okText:'Importer'}))return;
+      if(typeof pushUndo==='function')pushUndo('import ('+scope+')');
+      try{
+        const ok=applyImportedScoped(incoming,scope);
+        _dataIoStatus(ok?'✓ Import réussi':'✕ Rien à importer pour ce périmètre',ok?'var(--green)':'var(--red)');
+        if(ok&&typeof toast==='function')toast('Import réussi');
+      }catch(err){_dataIoStatus('✕ Échec de l\'import','var(--red)');}
+    };
+  });
+}
+
 // ── Synchronisation par code (mobile ↔ PC) ───────────────────────
 // Envoie les données au Worker, qui renvoie un code court à reporter sur
 // l'autre appareil. Affiche le code dans la zone prévue de la modale.
-async function syncSave(){
-  const btn=document.getElementById('sync-save-btn');
-  const out=document.getElementById('sync-code-output');
+async function syncSave(ctx){
+  const sfx=ctx==='cf'?'-cf':'';
+  const btn=document.getElementById('sync-save-btn'+sfx);
+  const out=document.getElementById('sync-code-output'+sfx);
   if(btn){btn.disabled=true;btn.textContent='Envoi…';}
   if(out)out.innerHTML='';
   try{
@@ -2354,8 +2548,8 @@ async function syncSave(){
       const exp=d.expiresAt?new Date(d.expiresAt).toLocaleDateString('fr-FR'):'';
       if(out)out.innerHTML='<div style="font-size:11px;font-family:var(--mono);color:var(--text3);margin-bottom:6px;">Ton code de récupération :</div>'
         +'<div style="display:flex;align-items:center;gap:8px;">'
-        +'<span id="sync-code-val" style="font-size:26px;font-weight:700;font-family:var(--mono);letter-spacing:.12em;color:var(--accent);">'+d.code+'</span>'
-        +'<button onclick="copySyncCode()" class="btn-ghost" style="font-size:11px;padding:5px 10px;">Copier</button>'
+        +'<span class="sync-code-val" style="font-size:26px;font-weight:700;font-family:var(--mono);letter-spacing:.12em;color:var(--accent);">'+d.code+'</span>'
+        +'<button onclick="copySyncCode(this)" class="btn-ghost" style="font-size:11px;padding:5px 10px;">Copier</button>'
         +'</div>'
         +'<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:8px;line-height:1.45;">Sur ton autre appareil : ouvre Folia → Paramètres → « Récupérer avec un code » → saisis ce code.'
         +(exp?'<br>Ce code expire le '+exp+'.':'')+'</div>';
@@ -2367,18 +2561,20 @@ async function syncSave(){
   }
   if(btn){btn.disabled=false;btn.textContent='⟳ Générer un nouveau code';}
 }
-function copySyncCode(){
-  const el=document.getElementById('sync-code-val');
+function copySyncCode(btn){
+  // Le code à copier est le frère .sync-code-val dans le même bloc
+  const el=btn?btn.parentElement.querySelector('.sync-code-val'):document.querySelector('.sync-code-val');
   if(el&&navigator.clipboard){navigator.clipboard.writeText(el.textContent).then(()=>toast('Code copié')).catch(()=>{});}
 }
 // Récupère les données associées à un code et les applique (après confirmation).
-async function syncLoad(){
-  const inp=document.getElementById('sync-code-input');
-  const out=document.getElementById('sync-load-output');
+async function syncLoad(ctx){
+  const sfx=ctx==='cf'?'-cf':'';
+  const inp=document.getElementById('sync-code-input'+sfx);
+  const out=document.getElementById('sync-load-output'+sfx);
   const code=(inp?inp.value:'').trim().toUpperCase();
   if(out)out.innerHTML='';
   if(code.length<4){if(out)out.innerHTML='<div style="font-size:12px;color:var(--amber);font-family:var(--mono);">Entre un code valide.</div>';return;}
-  const btn=document.getElementById('sync-load-btn');
+  const btn=document.getElementById('sync-load-btn'+sfx);
   if(btn){btn.disabled=true;btn.textContent='Récupération…';}
   try{
     const r=await fetch('/api/sync/load?code='+encodeURIComponent(code));
@@ -2390,10 +2586,10 @@ async function syncLoad(){
       if(!incoming||!Array.isArray(incoming.etfs)){
         if(out)out.innerHTML='<div style="font-size:12px;color:var(--red);font-family:var(--mono);">Données illisibles pour ce code.</div>';
       } else {
-        if(await confirmModal('Récupérer ces données ? Tes données actuelles sur cet appareil seront remplacées.',{okText:'Récupérer'})){
+        if(await confirmModal('Récupérer ces données ? Elles concernent l\'ensemble de Folia (DCA + Cashflow) et remplaceront tes données actuelles sur cet appareil.',{okText:'Récupérer'})){
           pushUndo('récupération par code');
           applyImportedState(incoming);
-          closeSettings();
+          closeSettings();closeCfSettings();
           toast('✓ Données récupérées');
         }
       }
@@ -3009,6 +3205,7 @@ renderDayPicker();
     state.reminderDay=Math.min(28,Math.max(1,+document.getElementById('reminder-day').value||1));
     state.driftAlert=Math.min(50,Math.max(1,+document.getElementById('drift-alert').value||8));
     save();
+    if(typeof cfOnDcaMonthlyChange==='function')cfOnDcaMonthlyChange(); // répercute sur le Cashflow lié
     updateHealthBar();
     renderMonthly(); // le plan dépend des frais
     const pp=document.getElementById('page-projection');

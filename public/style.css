@@ -367,3 +367,18 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 
 /* Cashflow — conteneurs en colonne flex pour permettre le tri visuel (ordre flexbox) */
 #cf-list-income,#cf-list-invest,#cf-list-expenses,.cf-cat-items{display:flex;flex-direction:column;}
+
+/* Cashflow — bouton de lien d'une ligne d'investissement avec l'épargne DCA */
+.cf-link{display:none;background:transparent;border:1px solid var(--border);color:var(--text3);width:30px;height:31px;border-radius:var(--r);cursor:pointer;flex-shrink:0;font-size:13px;line-height:1;align-items:center;justify-content:center;padding:0;}
+.cf-row.pea .cf-link{display:inline-flex;} /* visible seulement quand « PEA » est détecté */
+.cf-link:hover{border-color:var(--accent);color:var(--accent);}
+.cf-link.on{border-color:var(--accent);color:var(--accent);background:rgba(79,142,247,.12);}
+
+/* Cashflow — bouton "Découvrir mon cashflow" + mise en valeur du diagramme */
+.cf-discover{background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-size:13px;font-weight:600;padding:10px 20px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:border-color .15s ease,background .15s ease,transform .15s ease;}
+.cf-discover:hover{border-color:var(--accent);background:var(--bg4);transform:translateY(-1px);}
+.cf-discover span{transition:transform .2s ease;}
+.cf-discover:hover span{transform:translateY(2px);}
+@keyframes cfPulse{0%{box-shadow:0 0 0 0 rgba(79,142,247,0);}30%{box-shadow:0 0 0 3px rgba(79,142,247,.35);}100%{box-shadow:0 0 0 0 rgba(79,142,247,0);}}
+.cf-pulse{animation:cfPulse 1.2s ease;border-radius:var(--r2);}
+#cf-discover-target{scroll-margin-top:80px;border-radius:var(--r2);}
