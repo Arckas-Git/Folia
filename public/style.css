@@ -1,6 +1,6 @@
 :root{--bg:#0e0f11;--bg2:#151619;--bg3:#1c1e22;--bg4:#22252b;--border:#2a2d33;--border2:#363a42;--text:#e8eaf0;--text2:#8a8f9e;--text3:#555a66;--accent:#4f8ef7;--accent2:#2d6be4;--green:#34d399;--amber:#fbbf24;--red:#f87171;--purple:#a78bfa;--font:'Syne',sans-serif;--mono:'IBM Plex Mono',monospace;--r:6px;--r2:10px;}
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;min-height:100dvh;}
 /* ── INTRO ANIMATION ─────────────────────────────────────── */
 #intro-screen{position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 45%,#16181d 0%,var(--bg) 70%);display:flex;align-items:center;justify-content:center;animation:introFade .6s ease-in 2.4s forwards;}
 #intro-screen.done{display:none;}
@@ -259,9 +259,9 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
   .nav-tabs::-webkit-scrollbar{display:none;}
   .nav-tabs{scrollbar-width:none;}
 
-  /* — Sélecteur d'outil compact sur mobile : on masque le nom, on garde l'icône — */
-  .tool-name{display:none;}
-  .tool-switch{padding:5px 9px;gap:5px;}
+  /* — Bulles d'outil compactes sur mobile (on garde le nom, il est court) — */
+  .tool-bubble{padding:2px 3px 1px;}
+  .tool-bubble-dot{width:27px;height:27px;font-size:14px;}
   .nav-left{gap:8px;}
   .health-value{font-size:14px;}
   .reminder-banner{margin-left:0;width:100%;justify-content:center;}
@@ -322,17 +322,16 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 /* Logo + sélecteur d'outil côte à côte */
 .nav-left{display:flex;align-items:center;gap:12px;}
 /* Bouton sélecteur d'outil explicite (à droite du logo) */
-.tool-switch{position:relative;cursor:pointer;user-select:none;display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:5px 12px;transition:border-color .18s ease,background .18s ease;}
-.tool-switch:hover{border-color:var(--accent);background:var(--bg4);}
-.tool-icon{font-size:14px;line-height:1;}
-.tool-name{font-size:12px;font-weight:600;font-family:var(--mono);letter-spacing:.01em;white-space:nowrap;}
-.tool-caret{font-size:10px;color:var(--text3);transition:transform .18s ease;}
-.tool-switch.open .tool-caret{transform:rotate(180deg);}
-.tool-switch.open{border-color:var(--accent);}
-.section-menu{position:absolute;top:calc(100% + 8px);left:0;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);padding:5px;min-width:190px;display:none;flex-direction:column;gap:2px;z-index:9000;box-shadow:0 8px 24px rgba(0,0,0,.4);}
-.section-menu.open{display:flex;}
-.section-menu button{background:transparent;border:none;color:var(--text);font-size:13px;text-align:left;padding:9px 12px;border-radius:var(--r);cursor:pointer;font-family:inherit;}
-.section-menu button:hover{background:var(--bg4);}
+/* Sélecteur d'outil : bulles cliquables (icône + nom dessous), bascule en un clic */
+.tool-bubbles{display:flex;gap:2px;align-items:flex-start;}
+.tool-bubble{display:flex;flex-direction:column;align-items:center;gap:3px;background:transparent;border:none;border-radius:var(--r);padding:2px 4px 1px;cursor:pointer;color:var(--text3);transition:color .15s ease;}
+.tool-bubble:hover{color:var(--text2);}
+.tool-bubble:hover .tool-bubble-dot{border-color:var(--accent);background:var(--bg4);}
+.tool-bubble-dot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;background:var(--bg3);border:1px solid var(--border2);transition:border-color .18s ease,background .18s ease,box-shadow .18s ease;}
+.tool-bubble-label{font-size:10px;font-weight:600;font-family:var(--mono);letter-spacing:.02em;white-space:nowrap;}
+.tool-bubble.active{color:var(--accent);}
+.tool-bubble.active .tool-bubble-dot{background:rgba(79,142,247,.16);border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,142,247,.12);}
+.tool-bubble:active .tool-bubble-dot{transform:scale(.92);}
 
 /* ══════════ SECTION CASHFLOW ══════════ */
 .cf-intro{margin-bottom:1.25rem;}
@@ -384,7 +383,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 #cf-discover-target{scroll-margin-top:80px;border-radius:var(--r2);}
 
 /* Hub — bouton "Notes de mise à jour" ancré en bas, centré */
-#hub{position:relative;}
+#hub{position:relative;flex-direction:column;align-items:center;justify-content:center;padding:2rem;min-height:100vh;min-height:100dvh;}
 .hub-changelog{position:absolute;bottom:1.6rem;left:50%;transform:translateX(-50%);background:transparent;border:1px solid var(--border);color:var(--text2);font-size:12px;font-family:var(--mono);padding:8px 16px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s ease,color .15s ease,background .15s ease;white-space:nowrap;}
 .hub-changelog:hover{border-color:var(--accent);color:var(--text);background:var(--bg3);}
 
@@ -408,12 +407,16 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 .cf-couple-info{font-size:12px;color:var(--text2);font-family:var(--mono);line-height:1.5;}
 .cf-couple-hint{font-size:11px;color:var(--text3);font-family:var(--mono);}
 
-/* Bouton "partager" (½) sur une ligne de dépense — visible seulement en mode couple */
-.cf-split{display:none;background:transparent;border:1px solid var(--border);color:var(--text3);width:30px;height:31px;border-radius:var(--r);cursor:pointer;flex-shrink:0;font-size:15px;line-height:1;align-items:center;justify-content:center;padding:0;}
+/* Boutons de partage (dépenses, mode couple) : pro-rata (👫) et pourcentage (%) */
+.cf-split{display:none;background:transparent;border:1px solid var(--border);color:var(--text3);width:30px;height:31px;border-radius:var(--r);cursor:pointer;flex-shrink:0;font-size:13px;line-height:1;align-items:center;justify-content:center;padding:0;}
 .cf-row.couple .cf-split{display:inline-flex;}
 .cf-split:hover{border-color:var(--purple);color:var(--purple);}
-.cf-split.on{border-color:var(--purple);color:var(--purple);background:rgba(167,139,250,.14);}
+.cf-split.on{border-color:var(--purple);color:var(--purple);background:rgba(167,139,250,.16);}
+.cf-pct{font-weight:600;}
+.cf-pct-in{width:54px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:2px 6px;font-size:11px;text-align:center;font-family:var(--mono);}
 .cf-share-note{font-size:10px;color:var(--purple);font-family:var(--mono);margin:-2px 0 2px 2px;opacity:.9;flex-basis:100%;width:100%;}
+/* récap de répartition au niveau d'une catégorie entièrement partagée */
+.cf-cat-share{font-size:11px;color:var(--text2);font-family:var(--mono);background:rgba(167,139,250,.10);border:1px solid rgba(167,139,250,.22);border-radius:var(--r);padding:6px 9px;margin:2px 0 8px;line-height:1.4;}
 /* bouton "partager toute la catégorie" dans l'en-tête (toujours visible en mode couple) */
 .cf-split-cat{display:inline-flex;width:26px;height:26px;font-size:13px;}
 
@@ -473,3 +476,46 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
   .order-row,.alloc-item,.health-item{transition:none;}
   .order-row:hover,.alloc-item:hover,.health-item:hover{transform:none;}
 }
+
+/* ── Onglet Suggestions (Cashflow) ── */
+.cf-back{background:transparent;border:1px solid var(--border);color:var(--text2);padding:6px 12px;border-radius:var(--r);font-size:13px;font-family:var(--mono);cursor:pointer;transition:border-color .15s,color .15s;}
+.cf-back:hover{border-color:var(--accent);color:var(--accent);}
+.cf-sg-intro{margin-bottom:1.1rem;}
+.cf-sg-title{font-size:18px;font-weight:600;}
+.cf-sg-sub{font-size:12px;color:var(--text2);font-family:var(--mono);line-height:1.55;margin-top:.25rem;}
+.cf-sg-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:1.1rem 1.2rem;margin-bottom:1rem;}
+.cf-sg-h{font-size:14px;font-weight:600;margin-bottom:.6rem;}
+.cf-sg-line{font-size:12.5px;color:var(--text2);font-family:var(--mono);line-height:1.6;margin-bottom:.35rem;}
+.cf-sg-line strong{color:var(--text);}
+.cf-lev{margin:.55rem 0;}
+.cf-lev-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-family:var(--mono);color:var(--text);margin-bottom:4px;gap:8px;}
+.cf-lev-val{color:var(--text2);white-space:nowrap;}
+.cf-lev-track{height:8px;background:var(--bg3);border-radius:6px;overflow:hidden;}
+.cf-lev-bar{height:100%;background:var(--amber);border-radius:6px;transition:width .4s cubic-bezier(.22,1,.36,1);}
+.cf-lev-bar.want{background:var(--purple);}
+.cf-sg-tag{display:inline-block;font-size:9.5px;font-family:var(--mono);color:var(--purple);border:1px solid rgba(167,139,250,.4);border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle;}
+.cf-sg-foot{font-size:11px;color:var(--text3);font-family:var(--mono);line-height:1.6;border-top:1px solid var(--border);padding-top:.9rem;margin-top:.4rem;}
+
+/* ── Onglet Sécurité (matelas de précaution) ── */
+.cf-sf-row{margin-bottom:1rem;}
+.cf-sf-field{display:flex;flex-direction:column;gap:5px;}
+.cf-sf-field>span{font-size:12px;color:var(--text2);font-family:var(--mono);}
+.cf-sf-amt{display:flex;align-items:center;gap:6px;font-family:var(--mono);color:var(--text2);font-size:15px;}
+.cf-sf-amt input{flex:1;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:9px 12px;font-size:18px;font-weight:600;font-family:var(--mono);text-align:right;}
+.cf-sf-amt input:focus{border-color:var(--accent);outline:none;}
+.cf-sf-slider{margin:1.1rem 0 .5rem;}
+.cf-sf-slider-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text2);font-family:var(--mono);margin-bottom:.5rem;}
+.cf-sf-slider-top strong{color:var(--accent);font-size:14px;}
+.cf-sf-slider input[type=range]{width:100%;accent-color:var(--accent);}
+.cf-sf-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px;padding:0 2px;}
+.cf-sf-target{font-size:13px;color:var(--text2);font-family:var(--mono);margin:.9rem 0 .7rem;line-height:1.5;}
+.cf-sf-bar-track{height:12px;background:var(--bg3);border-radius:8px;overflow:hidden;border:1px solid var(--border);}
+.cf-sf-bar{height:100%;width:0;border-radius:8px;transition:width .5s cubic-bezier(.22,1,.36,1),background .3s ease;}
+.cf-sf-statusrow{display:flex;justify-content:space-between;align-items:center;margin-top:.6rem;}
+.cf-sf-status{font-size:11px;font-weight:600;font-family:var(--mono);padding:3px 10px;border-radius:20px;border:1px solid var(--border2);color:var(--text2);}
+.cf-sf-status.low{color:var(--red);border-color:rgba(248,113,113,.4);background:rgba(248,113,113,.10);}
+.cf-sf-status.mid{color:var(--amber);border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.10);}
+.cf-sf-status.ok{color:var(--green);border-color:rgba(52,211,153,.4);background:rgba(52,211,153,.10);}
+.cf-sf-status.over{color:var(--accent);border-color:rgba(79,142,247,.4);background:rgba(79,142,247,.10);}
+.cf-sf-cov{font-size:11px;color:var(--text3);font-family:var(--mono);}
+.cf-sf-foot{font-size:10.5px;color:var(--text3);font-family:var(--mono);line-height:1.6;border-top:1px solid var(--border);padding-top:.8rem;margin-top:.6rem;}

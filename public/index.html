@@ -20,7 +20,7 @@
   </div>
 </div>
 <!-- ══════════ HUB D'ACCUEIL (choix de section au 1er lancement) ══════════ -->
-<div id="hub" style="display:none;min-height:100vh;display:none;flex-direction:column;align-items:center;justify-content:center;padding:2rem;">
+<div id="hub" style="display:none;">
   <div style="font-size:32px;font-weight:700;font-family:var(--display);letter-spacing:-.02em;margin-bottom:.4rem;">Folia<span style="color:var(--accent);">.</span></div>
   <div style="font-size:13px;color:var(--text2);font-family:var(--mono);margin-bottom:2.5rem;text-align:center;max-width:420px;line-height:1.5;">Ta boîte à outils de gestion de patrimoine. Choisis par où commencer — tu pourras passer de l'une à l'autre à tout moment.</div>
   <div style="display:flex;gap:1.25rem;flex-wrap:wrap;justify-content:center;max-width:640px;">
@@ -44,12 +44,9 @@
 <nav class="nav">
   <div class="nav-left">
     <div class="nav-logo" onclick="showSection('hub')" title="Revenir à l'accueil">Folia<span>.</span></div>
-    <div class="tool-switch" onclick="toggleSectionMenu(event)">
-      <span class="tool-icon">&#128200;</span><span class="tool-name">DCA sur PEA</span><span class="tool-caret">▾</span>
-      <div class="section-menu" id="section-menu">
-        <button onclick="showSection('dca',event)">&#128200; DCA sur PEA</button>
-        <button onclick="showSection('cashflow',event)">&#128176; Cashflow</button>
-      </div>
+    <div class="tool-bubbles">
+      <button class="tool-bubble" data-sec="dca" onclick="showSection('dca',event)" title="DCA sur PEA"><span class="tool-bubble-dot">&#128200;</span><span class="tool-bubble-label">DCA</span></button>
+      <button class="tool-bubble" data-sec="cashflow" onclick="showSection('cashflow',event)" title="Cashflow"><span class="tool-bubble-dot">&#128176;</span><span class="tool-bubble-label">Cashflow</span></button>
     </div>
   </div>
   <div class="nav-tabs">
@@ -275,15 +272,16 @@
   <nav class="nav">
     <div class="nav-left">
       <div class="nav-logo" onclick="showSection('hub')" title="Revenir à l'accueil">Folia<span>.</span></div>
-      <div class="tool-switch" onclick="toggleSectionMenu(event)">
-        <span class="tool-icon">&#128176;</span><span class="tool-name">Cashflow</span><span class="tool-caret">▾</span>
-        <div class="section-menu" id="section-menu-cf">
-          <button onclick="showSection('dca',event)">&#128200; DCA sur PEA</button>
-          <button onclick="showSection('cashflow',event)">&#128176; Cashflow</button>
-        </div>
+      <div class="tool-bubbles">
+        <button class="tool-bubble" data-sec="dca" onclick="showSection('dca',event)" title="DCA sur PEA"><span class="tool-bubble-dot">&#128200;</span><span class="tool-bubble-label">DCA</span></button>
+        <button class="tool-bubble" data-sec="cashflow" onclick="showSection('cashflow',event)" title="Cashflow"><span class="tool-bubble-dot">&#128176;</span><span class="tool-bubble-label">Cashflow</span></button>
       </div>
     </div>
-    <div style="flex:1;"></div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" id="cf-tab-main" onclick="cfNav('main')">&#128176; Cashflow</button>
+      <button class="nav-tab" id="cf-tab-safety" onclick="cfNav('safety')">&#128737;&#65039; Sécurité</button>
+      <button class="nav-tab" id="cf-tab-suggest" onclick="cfNav('suggest')" style="display:none;">&#128161; Suggestions</button>
+    </div>
     <div style="display:flex;align-items:center;gap:8px;">
       <button onclick="openCfSettings()" style="background:transparent;border:1px solid var(--border);color:var(--text3);padding:5px 10px;font-size:13px;border-radius:var(--r);">&#9881; Paramètres</button>
     </div>
@@ -337,7 +335,24 @@
         <div class="card-title" style="margin-bottom:.85rem;">Diagramme de flux</div>
         <div id="cf-sankey-wrap" style="overflow-x:auto;"><div id="cf-sankey"></div></div>
       </div>
+
+      <div id="cf-suggest-btn-wrap" style="display:none;text-align:center;margin-top:1.2rem;">
+        <button class="cf-discover" onclick="cfShowSuggest()">&#128161; Comment investir davantage <span style="font-size:14px;">&#8594;</span></button>
+      </div>
     </div>
+  </div>
+
+  <!-- Onglet : suggestions d'amélioration des dépenses (accessible une fois le diagramme généré) -->
+  <div class="page" id="page-cf-suggest">
+    <div style="margin-bottom:1.1rem;">
+      <button class="cf-back" onclick="cfNav('main')"><span style="font-size:14px;">&#8592;</span> Retour au cashflow</button>
+    </div>
+    <div id="cf-suggest-body"></div>
+  </div>
+
+  <!-- Onglet : matelas de sécurité (épargne de précaution) -->
+  <div class="page" id="page-cf-safety">
+    <div id="cf-safety-body"></div>
   </div>
 </div>
 <!-- SETTINGS OVERLAY -->
@@ -465,7 +480,7 @@
     <button class="btn-ghost" style="width:100%;" onclick="goToManualEntry()">Ajouter mes ETF manuellement →</button>
   </div>
 </div>
-<footer>Folia · v1.56.2 · Boîte à outils patrimoine · Données indicatives</footer>
+<footer>Folia · v1.58.0 · Boîte à outils patrimoine · Données indicatives</footer>
 <script src="app.js" defer></script>
 </body>
 </html>

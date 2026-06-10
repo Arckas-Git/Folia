@@ -92,18 +92,23 @@ function showSection(name,ev){
   if(!hub||!dca||!cf)return;
   // Tout masquer
   hub.style.display='none';dca.style.display='none';cf.style.display='none';
+  // Le footer (numéro de version) est masqué sur le hub pour éviter un débordement
+  // sous l'écran d'accueil plein hauteur ; il reste visible dans les outils.
+  const footer=document.querySelector('footer');if(footer)footer.style.display=(name==='hub')?'none':'';
   if(name==='hub'){ hub.style.display='flex'; }
   else if(name==='cashflow'){
     cf.style.display='block'; state._section='cashflow'; save();
     // Filet de sécurité : la navigation interne du DCA a pu retirer la classe
     // .active de cette page ; on la remet pour garantir l'affichage.
     const cfPage=document.getElementById('page-cashflow'); if(cfPage)cfPage.classList.add('active');
+    if(typeof cfNav==='function')cfNav('main'); // toujours revenir sur la page principale
     try{ if(typeof cfSeedIfEmpty==='function')cfSeedIfEmpty(); if(typeof renderCashflow==='function')renderCashflow(); }catch(e){ console&&console.warn&&console.warn('Cashflow render:',e); }
     // Entrée animée en cascade des blocs (rejouée à chaque ouverture de la section)
     cf.classList.remove('cf-entering');void cf.offsetWidth;cf.classList.add('cf-entering');
     setTimeout(()=>cf.classList.remove('cf-entering'),700);
   }
   else { dca.style.display='block'; state._section='dca'; save(); }
+  if(name==='dca'||name==='cashflow')setActiveToolBubble(name);
   closeSectionMenu();
 }
 window.showSection=showSection;
@@ -121,6 +126,11 @@ function toggleSectionMenu(ev){
   if(willOpen){menu.classList.add('open');sw.classList.add('open');}
 }
 window.toggleSectionMenu=toggleSectionMenu;
+// Met en valeur la bulle de l'outil actif (DCA / Cashflow) dans toutes les barres.
+function setActiveToolBubble(name){
+  document.querySelectorAll('.tool-bubble').forEach(b=>b.classList.toggle('active',b.dataset.sec===name));
+}
+window.setActiveToolBubble=setActiveToolBubble;
 function closeSectionMenu(){
   document.querySelectorAll('.section-menu').forEach(m=>m.classList.remove('open'));
   document.querySelectorAll('.tool-switch').forEach(s=>s.classList.remove('open'));
@@ -156,7 +166,11 @@ function cfData(){
       ?{name:cat.name||'',items:(Array.isArray(cat.items)?cat.items:[]).map(it=>{
           const o={name:it.name||'',amount:Math.max(0,+it.amount||0)};
           if(key==='invest'&&it.dca)o.dca=true;   // lien avec l'épargne DCA (investissements)
-          if(key==='expense'&&it.split)o.split=true; // charge partagée en mode couple (dépenses)
+          if(key==='expense'&&it.split){           // charge partagée en mode couple (dépenses)
+            o.split=true;
+            o.splitMode=(it.splitMode==='percent')?'percent':'prorata'; // méthode PAR LIGNE
+            if(o.splitMode==='percent')o.splitPct=Math.min(100,Math.max(0,it.splitPct!=null?+it.splitPct:50));
+          }
           return o;
         })}
       :{name:'',items:[]});
@@ -167,22 +181,31 @@ function cfData(){
   c.couple={
     enabled:!!cp.enabled,
     partnerName:cp.partnerName||'',
-    partnerIncome:Math.max(0,+cp.partnerIncome||0),
-    mode:(cp.mode==='percent')?'percent':'prorata',
-    percent:Math.min(100,Math.max(0,cp.percent!=null?+cp.percent:50))
+    partnerIncome:Math.max(0,+cp.partnerIncome||0)
+  };
+  // Matelas de sécurité (épargne de précaution) : montant détenu + objectif en mois de dépenses
+  const sf=(c.safety&&typeof c.safety==='object')?c.safety:{};
+  c.safety={
+    amount:Math.max(0,+sf.amount||0),
+    months:Math.min(12,Math.max(1,sf.months!=null?+sf.months:4))
   };
   return c;
 }
-// Part de l'utilisateur (fraction 0..1) sur une charge partagée.
-function cfShare(){
+// Part de l'utilisateur AU PRO-RATA des salaires (fraction 0..1).
+function cfProRataShare(){
   const cp=cfData().couple;if(!cp.enabled)return 1;
-  if(cp.mode==='percent')return Math.min(1,Math.max(0,(+cp.percent||0)/100));
-  const me=cfSumIncome(),other=+cp.partnerIncome||0,tot=me+other; // pro-rata des salaires
+  const me=cfSumIncome(),other=+cp.partnerIncome||0,tot=me+other;
   return tot>0?me/tot:1;
+}
+// Part de l'utilisateur sur une ligne donnée (selon sa méthode de partage).
+function cfItemShare(it){
+  if(!it||!it.split)return 1;
+  if(it.splitMode==='percent')return Math.min(1,Math.max(0,(+it.splitPct||0)/100));
+  return cfProRataShare();
 }
 // Montant réellement compté pour un item (part utilisateur si charge partagée).
 function cfEffAmount(kind,it){
-  if(kind==='expense'&&it&&it.split&&cfData().couple.enabled)return (+it.amount||0)*cfShare();
+  if(kind==='expense'&&it&&it.split&&cfData().couple.enabled)return (+it.amount||0)*cfItemShare(it);
   return (+it.amount||0);
 }
 
@@ -291,14 +314,10 @@ function cfSetCouple(field,val){
   if(field==='enabled')c.couple.enabled=!!val;
   else if(field==='partnerName')c.couple.partnerName=val;
   else if(field==='partnerIncome')c.couple.partnerIncome=Math.max(0,+val||0);
-  else if(field==='mode')c.couple.mode=(val==='percent')?'percent':'prorata';
-  else if(field==='percent')c.couple.percent=Math.min(100,Math.max(0,+val||0));
   save();
 }
-// Active/coupe le mode couple (reconstruit pour afficher/masquer les boutons « partager »).
+// Active/coupe le mode couple (reconstruit pour afficher/masquer les boutons de partage).
 function cfToggleCouple(on){pushUndo('mode couple');cfSetCouple('enabled',on);renderCashflow();}
-// Change le mode de répartition (pro-rata / pourcentage).
-function cfSetCoupleMode(mode){cfSetCouple('mode',mode);renderCashflow();}
 // Texte d'info pro-rata (réutilisé pour la mise à jour en direct).
 function cfProRataText(cp){
   const me=cfSumIncome(),other=+cp.partnerIncome||0,tot=me+other;
@@ -320,30 +339,64 @@ function cfSetCoupleField(field,val){
 }
 // Met à jour en place les notes de part (sans reconstruire les lignes → focus préservé).
 function cfUpdateShareNotes(){
-  const share=cfShare();
-  document.querySelectorAll('#cf-list-expenses .cf-row.split .cf-share-note').forEach(note=>{
-    const amtEl=note.parentElement.querySelector('.cf-amt');const full=+ (amtEl?amtEl.value:0)||0;
-    note.textContent='ta part : '+Math.round(full*share).toLocaleString('fr-FR')+' € sur '+Math.round(full).toLocaleString('fr-FR')+' €';
+  const cp=cfData().couple;
+  const who=cp.partnerName?_esc(cp.partnerName):'conjoint·e';
+  const f=v=>Math.round(v).toLocaleString('fr-FR')+' €';
+  // Texte du pro-rata dans le panneau couple (dépend AUSSI de ton propre revenu)
+  const info=document.getElementById('cf-couple-proinfo');
+  if(info){
+    info.innerHTML=cfProRataText(cp);
+    info.style.color=((cfSumIncome()+(+cp.partnerIncome||0))>0)?'':'var(--amber)';
+  }
+  // Résultats par ligne (lignes partagées d'une catégorie partiellement partagée)
+  cfData().expense.forEach((cat,ci)=>{(cat.items||[]).forEach((it,ii)=>{
+    const res=document.getElementById('cf-lineres-'+ci+'-'+ii);if(!res)return;
+    const a=+it.amount||0,my=a*cfItemShare(it);
+    res.textContent=f(my)+' · '+who+' '+f(a-my);
+  });});
+  // Notes au niveau catégorie (catégories entièrement partagées) — somme des parts effectives
+  cfData().expense.forEach((cat,ci)=>{
+    const el=document.getElementById('cf-cat-share-'+ci);if(!el)return;
+    const items=cat.items||[];
+    const full=items.reduce((s,it)=>s+(+it.amount||0),0);
+    const my=items.reduce((s,it)=>s+(+it.amount||0)*cfItemShare(it),0);
+    el.innerHTML='👫 ta part <strong style="color:var(--accent);">'+f(my)+'</strong> · '+who+' <strong>'+f(full-my)+'</strong> <span style="color:var(--text3);">(sur '+f(full)+')</span>';
   });
 }
 // Marque/démarque une dépense comme partagée.
-function cfToggleSplit(ci,ii){
+// Définit la méthode de partage d'une ligne : 'prorata' ou 'percent'.
+// Recliquer sur la méthode active la désactive (ligne non partagée).
+function cfSetLineSplit(ci,ii,mode){
   const c=cfData();const it=c.expense[ci]&&c.expense[ci].items[ii];if(!it)return;
   pushUndo('partage d\'une charge');
-  if(it.split)delete it.split;else it.split=true;
-  save();renderCashflow();cfPop('cf-split-'+ci+'-'+ii);
+  const current=it.split?(it.splitMode==='percent'?'percent':'prorata'):null;
+  if(current===mode){ // même méthode → on retire le partage
+    delete it.split;delete it.splitMode;delete it.splitPct;
+  } else {
+    it.split=true;it.splitMode=mode;
+    if(mode==='percent'&&it.splitPct==null)it.splitPct=50; // défaut
+    else if(mode==='prorata')delete it.splitPct;
+  }
+  save();renderCashflow();
+  cfPop(mode==='percent'?('cf-pct-'+ci+'-'+ii):('cf-pro-'+ci+'-'+ii));
 }
-// Partage (ou non) TOUTE une catégorie de dépenses d'un coup.
+// Modifie le pourcentage défini d'une ligne (sans reconstruire → focus du champ préservé).
+function cfSetLinePct(ci,ii,val){
+  const c=cfData();const it=c.expense[ci]&&c.expense[ci].items[ii];if(!it)return;
+  it.splitPct=Math.min(100,Math.max(0,+val||0));save();
+  cfUpdateTotals();renderSankey(); // recalcule totaux + diagramme + notes (via cfUpdateTotals)
+}
+// Partage (ou non) TOUTE une catégorie de dépenses d'un coup, au pro-rata.
 function cfToggleSplitCat(ci){
   const c=cfData();const cat=c.expense[ci];if(!cat||!cat.items.length)return;
   pushUndo('partage d\'une catégorie');
   const allSplit=cat.items.every(it=>it.split);
-  cat.items.forEach(it=>{ if(allSplit)delete it.split; else it.split=true; });
+  cat.items.forEach(it=>{ if(allSplit){delete it.split;delete it.splitMode;delete it.splitPct;} else {it.split=true;it.splitMode='prorata';delete it.splitPct;} });
   save();renderCashflow();cfPop('cf-splitcat-'+ci);
 }
 window.cfToggleSplitCat=cfToggleSplitCat;
-window.cfSetCouple=cfSetCouple;window.cfToggleCouple=cfToggleCouple;window.cfSetCoupleMode=cfSetCoupleMode;
-window.cfSetCoupleField=cfSetCoupleField;window.cfToggleSplit=cfToggleSplit;
+window.cfSetCouple=cfSetCouple;window.cfToggleCouple=cfToggleCouple;
+window.cfSetCoupleField=cfSetCoupleField;window.cfSetLineSplit=cfSetLineSplit;window.cfSetLinePct=cfSetLinePct;
 window.cfAddCat=cfAddCat;window.cfDelCat=cfDelCat;window.cfSetCat=cfSetCat;window.cfAddItem=cfAddItem;window.cfDelItem=cfDelItem;window.cfSetItem=cfSetItem;
 
 // ── Totaux ──
@@ -366,21 +419,23 @@ function cfUpdateTotals(){
   ['invest','expense'].forEach(key=>{
     cfData()[key].forEach((cat,ci)=>{const e=document.getElementById('cf-cat-total-'+key+'-'+ci);if(e)e.textContent=fmt(cfCatTotal(cat,key));});
   });
+  if(typeof cfUpdateShareNotes==='function')cfUpdateShareNotes(); // rafraîchit les parts (ligne + catégorie) en direct
   const sum=document.getElementById('cf-summary');
   if(sum){
     if(inc<=0){sum.innerHTML='<span style="color:var(--text3);font-family:var(--mono);font-size:12px;">Ajoute au moins un revenu pour voir ton taux d\'épargne.</span>';}
     else{
       const warn=left<0?'<div style="color:var(--red);font-size:12px;font-family:var(--mono);margin-top:6px;">⚠ Tes sorties dépassent tes revenus : tu puises dans tes réserves.</div>':'';
-      // Récapitulatif des charges partagées (mode couple)
+      // Récapitulatif des charges partagées (mode couple) — somme des parts par ligne,
+      // chaque ligne pouvant être au pro-rata OU à un pourcentage défini.
       let couple='';const cp=cfData().couple;
       if(cp.enabled){
-        let full=0;cfData().expense.forEach(cat=>cat.items.forEach(it=>{if(it.split)full+=(+it.amount||0);}));
+        let full=0,myShare=0;
+        cfData().expense.forEach(cat=>cat.items.forEach(it=>{if(it.split){const a=+it.amount||0;full+=a;myShare+=a*cfItemShare(it);}}));
         if(full>0){
-          const myShare=full*cfShare(),partner=full-myShare;
+          const partner=full-myShare;
           const who=cp.partnerName?_esc(cp.partnerName):'ton/ta conjoint·e';
-          const key=cp.mode==='percent'?('réparties à '+(+cp.percent||0)+' % / '+(100-(+cp.percent||0))+' %'):'réparties au pro-rata des salaires';
           couple='<div style="margin-top:8px;font-size:12px;color:var(--text2);font-family:var(--mono);border-top:1px solid var(--border);padding-top:8px;">'
-            +'👫 Charges communes ('+fmt(full)+', '+key+') — ta part <strong style="color:var(--accent);">'+fmt(myShare)+'</strong> · part de '+who+' <strong>'+fmt(partner)+'</strong></div>';
+            +'👫 Charges communes ('+fmt(full)+') — ta part <strong style="color:var(--accent);">'+fmt(myShare)+'</strong> · part de '+who+' <strong>'+fmt(partner)+'</strong></div>';
         }
       }
       sum.innerHTML='Ton taux d\'épargne est de <strong style="color:var(--accent);">'+rate.toFixed(1)+' %</strong> '
@@ -404,26 +459,14 @@ function cfRenderCouple(){
     +'<span class="cf-couple-sub">Répartis certaines charges entre deux salaires</span>'
     +'</div>';
   if(!cp.enabled){host.innerHTML=head;return;}
-  const me=cfSumIncome(),other=+cp.partnerIncome||0,tot=me+other;
-  const myPct=tot>0?Math.round(me/tot*100):50;
-  const proInfo=cp.mode==='prorata'
-    ? '<div class="cf-couple-info" id="cf-couple-proinfo">'+cfProRataText(cp)+'</div>'
-    : '';
+  const proInfo='<div class="cf-couple-info" id="cf-couple-proinfo">'+cfProRataText(cp)+'</div>';
   const body='<div class="cf-couple-body">'
     +'<div class="cf-couple-fields">'
       +'<label class="cf-couple-field"><span>Prénom du conjoint·e</span><input type="text" placeholder="ex. Alex" value="'+_esc(cp.partnerName)+'" oninput="cfSetCoupleField(\'partnerName\',this.value)"/></label>'
       +'<label class="cf-couple-field"><span>Son salaire net mensuel</span><input type="number" min="0" step="50" placeholder="0" value="'+(cp.partnerIncome||'')+'" oninput="cfSetCoupleField(\'partnerIncome\',this.value)"/></label>'
     +'</div>'
-    +'<div class="cf-couple-mode">'
-      +'<span class="cf-couple-modelabel">Répartition :</span>'
-      +'<label class="cf-radio"><input type="radio" name="cf-split-mode" '+(cp.mode==='prorata'?'checked':'')+' onchange="cfSetCoupleMode(\'prorata\')"/> Pro-rata des salaires</label>'
-      +'<label class="cf-radio"><input type="radio" name="cf-split-mode" '+(cp.mode==='percent'?'checked':'')+' onchange="cfSetCoupleMode(\'percent\')"/> Pourcentage défini</label>'
-      +(cp.mode==='percent'
-        ? '<span class="cf-couple-pct">Ma part : <input type="number" min="0" max="100" step="5" value="'+(cp.percent)+'" oninput="cfSetCoupleField(\'percent\',this.value)"/> %</span>'
-        : '')
-    +'</div>'
     +proInfo
-    +'<div class="cf-couple-hint">Clique sur le bouton ÷ d\'une ligne de dépense pour la marquer comme partagée.</div>'
+    +'<div class="cf-couple-hint">Sur chaque ligne de dépense, deux boutons : <strong>👫</strong> partage <strong>au pro-rata</strong> des salaires, <strong>%</strong> partage selon un <strong>pourcentage que tu fixes</strong> pour cette ligne. Tu peux mélanger les deux selon les charges.</div>'
     +'</div>';
   host.innerHTML=head+body;
 }
@@ -444,13 +487,17 @@ function cfRenderCats(key){
   const cats=cfData()[key];
   if(!cats.length){list.innerHTML='<div class="cf-empty">Aucune catégorie pour l\'instant.</div>';return;}
   const coupleOn=cfData().couple.enabled;
-  const share=cfShare();
+  const prorata=cfProRataShare();
+  const f=v=>Math.round(v).toLocaleString('fr-FR')+' €';
   list.innerHTML=cats.map((cat,ci)=>{
     const catItems=cat.items||[];
+    const allSplit=(key==='expense'&&catItems.length>0&&catItems.every(it=>it.split));
     const items=catItems.map((it,ii)=>{
       const linked=(key==='invest'&&it.dca);
       const isPeaRow=(key==='invest'&&(it.dca||cfIsPea(it.name)));
       const splitOn=(key==='expense'&&it.split);
+      const isPct=(splitOn&&it.splitMode==='percent');
+      const isPro=(splitOn&&!isPct);
       const amtAttrs=linked
         ? 'value="'+(+state.monthly||0)+'" readonly title="Montant synchronisé avec ton épargne mensuelle DCA" style="opacity:.75;cursor:not-allowed;"'
         : 'value="'+(it.amount||0)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'amount\',this.value)" onchange="cfOnCommit()"';
@@ -458,29 +505,44 @@ function cfRenderCats(key){
       const linkBtn=(key==='invest')
         ? '<button id="cf-link-'+ci+'-'+ii+'" class="cf-link'+(linked?' on':'')+'" title="Lier / délier ce montant à ton épargne mensuelle DCA" onclick="cfToggleDca('+ci+','+ii+')">&#128279;</button>'
         : '';
-      // Bouton "partager" : dépenses, visible seulement en mode couple (classe .couple).
-      const splitBtn=(key==='expense')
-        ? '<button id="cf-split-'+ci+'-'+ii+'" class="cf-split'+(splitOn?' on':'')+'" title="Partager cette charge avec ton/ta conjoint·e" onclick="cfToggleSplit('+ci+','+ii+')">&#247;</button>'
+      // Deux boutons de partage (dépenses, mode couple) : pro-rata (👫) et pourcentage défini (%).
+      const splitBtns=(key==='expense')
+        ? '<button id="cf-pro-'+ci+'-'+ii+'" class="cf-split cf-pro'+(isPro?' on':'')+'" title="Partager au pro-rata des salaires" onclick="cfSetLineSplit('+ci+','+ii+',\'prorata\')">👫</button>'
+          +'<button id="cf-pct-'+ci+'-'+ii+'" class="cf-split cf-pct'+(isPct?' on':'')+'" title="Partager selon un pourcentage défini" onclick="cfSetLineSplit('+ci+','+ii+',\'percent\')">%</button>'
         : '';
-      // Note de part : DANS la ligne (largeur pleine, passe à la ligne) pour qu'elle
-      // suive sa dépense lors du tri visuel (sinon elle resterait sous la mauvaise ligne).
-      const shareNote=(splitOn&&coupleOn)
-        ? '<div class="cf-share-note">ta part : '+Math.round((+it.amount||0)*share).toLocaleString('fr-FR')+' € sur '+Math.round(+it.amount||0).toLocaleString('fr-FR')+' €</div>'
-        : '';
+      // Note de part PAR LIGNE — seulement si partagée ET catégorie pas entièrement partagée.
+      let shareNote='';
+      if(splitOn&&coupleOn&&!allSplit){
+        const my=(+it.amount||0)*cfItemShare(it),partner=(+it.amount||0)-my;
+        const who=cfData().couple.partnerName?_esc(cfData().couple.partnerName):'conjoint·e';
+        const res='<span id="cf-lineres-'+ci+'-'+ii+'">'+f(my)+' · '+who+' '+f(partner)+'</span>';
+        shareNote=isPct
+          ? '<div class="cf-share-note">ta part <input class="cf-pct-in" type="number" min="0" max="100" step="5" value="'+(it.splitPct!=null?it.splitPct:50)+'" oninput="cfSetLinePct('+ci+','+ii+',this.value)"/> % → '+res+'</div>'
+          : '<div class="cf-share-note">pro-rata ('+Math.round(prorata*100)+' %) → ta part '+res+'</div>';
+      }
       const rowCls='cf-row'+(isPeaRow?' pea':'')+(splitOn?' split':'')+(coupleOn?' couple':'');
       return '<div class="'+rowCls+'">'
         +'<input class="cf-name" type="text" placeholder="Nom" value="'+_esc(it.name)+'" oninput="cfSetItem(\''+key+'\','+ci+','+ii+',\'name\',this.value,this)" onchange="cfOnCommit()"/>'
-        +linkBtn+splitBtn
+        +linkBtn+splitBtns
         +'<input class="cf-amt" type="number" min="0" step="10" placeholder="0" '+amtAttrs+'/>'+CF_EUR
         +'<button class="cf-del" title="Supprimer" onclick="cfDelItem(\''+key+'\','+ci+','+ii+')">&times;</button>'
         +shareNote
         +'</div>';
     }).join('');
-    // Bouton "partager toute la catégorie" : dépenses, en mode couple.
-    const allSplit=(key==='expense'&&catItems.length>0&&catItems.every(it=>it.split));
+    // Bouton "partager toute la catégorie au pro-rata" : dépenses, en mode couple.
     const catSplitBtn=(key==='expense'&&coupleOn)
-      ? '<button id="cf-splitcat-'+ci+'" class="cf-split cf-split-cat'+(allSplit?' on':'')+'" title="Partager toute la catégorie avec ton/ta conjoint·e" onclick="cfToggleSplitCat('+ci+')">&#247;</button>'
+      ? '<button id="cf-splitcat-'+ci+'" class="cf-split cf-split-cat'+(allSplit?' on':'')+'" title="Partager toute la catégorie au pro-rata" onclick="cfToggleSplitCat('+ci+')">👫</button>'
       : '';
+    // Récap au niveau CATÉGORIE quand elle est entièrement partagée (somme des parts effectives).
+    let catShare='';
+    if(allSplit&&coupleOn){
+      const full=catItems.reduce((s,it)=>s+(+it.amount||0),0);
+      if(full>0){
+        const my=catItems.reduce((s,it)=>s+(+it.amount||0)*cfItemShare(it),0),partner=full-my;
+        const who=cfData().couple.partnerName?_esc(cfData().couple.partnerName):'ton/ta conjoint·e';
+        catShare='<div class="cf-cat-share" id="cf-cat-share-'+ci+'">👫 ta part <strong style="color:var(--accent);">'+f(my)+'</strong> · '+who+' <strong>'+f(partner)+'</strong> <span style="color:var(--text3);">(sur '+f(full)+')</span></div>';
+      }
+    }
     return '<div class="cf-cat">'
       +'<div class="cf-cat-head">'
       +'<input class="cf-cat-name" type="text" placeholder="Nom de la catégorie" value="'+_esc(cat.name)+'" oninput="cfSetCat(\''+key+'\','+ci+',this.value)" onchange="cfOnCommit()"/>'
@@ -488,6 +550,7 @@ function cfRenderCats(key){
       +catSplitBtn
       +'<button class="cf-del cf-del-cat" title="Supprimer la catégorie" onclick="cfDelCat(\''+key+'\','+ci+')">&times;</button>'
       +'</div>'
+      +catShare
       +'<div class="cf-cat-items">'+items+'</div>'
       +'<button class="cf-add-item" onclick="cfAddItem(\''+key+'\','+ci+')">+ Ajouter une ligne</button>'
       +'</div>';
@@ -558,7 +621,7 @@ function renderSankey(){
   const d=cfData();
   const incomes=d.income.filter(r=>(+r.amount||0)>0).map(r=>({name:r.name||'Revenu',value:+r.amount}));
   const T=incomes.reduce((s,r)=>s+r.value,0);
-  if(T<=0){host.innerHTML='<div class="cf-empty" style="padding:34px 0;">Renseigne tes revenus (et des montants) pour afficher le diagramme de flux.</div>';return;}
+  if(T<=0){host.innerHTML='<div class="cf-empty" style="padding:34px 0;">Renseigne tes revenus (et des montants) pour afficher le diagramme de flux.</div>';if(typeof cfToggleSuggestBtn==='function')cfToggleSuggestBtn(false);return;}
   // Catégories (enveloppes d'invest + catégories de dépenses), seulement celles >0
   // Palette volontairement désaturée (tons doux) pour rester lisible sur fond sombre.
   const palette=['#5fa98c','#9b90c0','#cf9a5f','#5faaa0','#6f97c4','#c182a3','#cc8585','#ccae6f','#8a8fbf','#c8946f'];
@@ -646,6 +709,7 @@ function renderSankey(){
   cats.forEach((c,j)=>{nodes+=rect(colX[2],catPos[j],c.color);labels+=pill(colX[2]+nodeW+6,catPos[j].y+catPos[j].h/2,c.name+': '+eur(c.value),'start');});
   if(reste>0){const j=cats.length;nodes+=rect(colX[2],catPos[j],'#555a66');labels+=pill(colX[2]+nodeW+6,catPos[j].y+catPos[j].h/2,'Reste disponible: '+eur(reste),'start');}
   host.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;height:auto;min-width:560px;" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">'+links+nodes+labels+'</svg>';
+  if(typeof cfToggleSuggestBtn==='function')cfToggleSuggestBtn(true);
 }
 window.renderSankey=renderSankey;
 
@@ -660,6 +724,179 @@ function cfScrollToDiagram(){
   setTimeout(()=>target.classList.remove('cf-pulse'),1300);
 }
 window.cfScrollToDiagram=cfScrollToDiagram;
+
+// ══════════ ONGLET « SUGGESTIONS » ══════════
+// Affiche/masque l'onglet « Suggestions » (en haut) ET le bouton sous le diagramme :
+// disponibles seulement quand le diagramme est généré (revenus > 0).
+function cfToggleSuggestBtn(show){
+  const w=document.getElementById('cf-suggest-btn-wrap');if(w)w.style.display=show?'block':'none';
+  const tab=document.getElementById('cf-tab-suggest');if(tab)tab.style.display=show?'':'none';
+  if(!show){const sug=document.getElementById('page-cf-suggest');if(sug&&sug.classList.contains('active'))cfNav('main');}
+}
+// Bascule entre les pages du cashflow (principale / suggestions / sécurité) + état des onglets.
+function cfNav(view){
+  const pages={main:'page-cashflow',suggest:'page-cf-suggest',safety:'page-cf-safety'};
+  const tabs={main:'cf-tab-main',suggest:'cf-tab-suggest',safety:'cf-tab-safety'};
+  if(!document.getElementById(pages.main))return;
+  if(view==='suggest')cfRenderSuggestions();
+  if(view==='safety')cfRenderSafety();
+  Object.keys(pages).forEach(k=>{
+    const p=document.getElementById(pages[k]);if(p)p.classList.toggle('active',k===view);
+    const t=document.getElementById(tabs[k]);if(t)t.classList.toggle('active',k===view);
+  });
+}
+window.cfNav=cfNav;
+function cfShowSuggest(){cfNav('suggest');window.scrollTo({top:0,behavior:'smooth'});}
+window.cfShowSuggest=cfShowSuggest;
+
+// Détection grossière des postes « plaisir » (souvent plus faciles à ajuster).
+const CF_WANTS=['resto','restaurant','sortie','loisir','abonnement','streaming','shopping','vêtement','vetement','café','cafe','bar','jeu','tabac','alcool','livraison','uber','deliveroo','plaisir','divertissement','netflix','spotify','ciné','cinema','voyage','vacances'];
+function cfIsWant(name){const n=(name||'').toLowerCase();return CF_WANTS.some(w=>n.includes(w));}
+
+function cfRenderSuggestions(){
+  const host=document.getElementById('cf-suggest-body');if(!host)return;
+  const fmt=v=>Math.round(v).toLocaleString('fr-FR')+' €';
+  const income=cfSumIncome(),invest=cfSumCats('invest'),expenses=cfSumCats('expense');
+  const left=income-invest-expenses;
+  const rate=income>0?invest/income*100:0;
+  const possible=income>0?(invest+Math.max(0,left))/income*100:0;
+  const pc=v=>income>0?Math.round(v/income*100):0;
+
+  // ── Bloc 1 : taux d'épargne + marge non investie ──
+  const targets=[10,20,30,40,50];
+  const next=targets.find(t=>t>rate+0.5);
+  let nextLine='';
+  if(next){const need=Math.max(0,income*next/100-invest);
+    nextLine='<div class="cf-sg-line">Prochain palier : <strong>'+next+' %</strong> → investir <strong style="color:var(--accent);">'+fmt(need)+'</strong> de plus par mois.</div>';}
+  let margin;
+  if(left>0.5)margin='<div class="cf-sg-line">Il te reste <strong style="color:var(--green);">'+fmt(left)+'</strong> non affectés chaque mois. En les investissant, tu passerais à <strong>'+possible.toFixed(0)+' %</strong> d\'épargne <em>sans toucher à tes dépenses</em> — c\'est ton levier le plus simple.</div>';
+  else if(left<-0.5)margin='<div class="cf-sg-line" style="color:var(--red);">Tes sorties dépassent tes revenus de <strong>'+fmt(-left)+'</strong>. La priorité est d\'équilibrer avant d\'investir davantage.</div>';
+  else margin='<div class="cf-sg-line">Tes revenus sont presque entièrement affectés. Pour investir plus, l\'idée est d\'alléger un poste de dépenses ci-dessous.</div>';
+  const block1='<div class="cf-sg-card">'
+    +'<div class="cf-sg-h">📊 Ton taux d\'épargne</div>'
+    +'<div class="cf-sg-line">Tu investis <strong style="color:var(--accent);">'+fmt(invest)+'</strong>/mois, soit <strong>'+rate.toFixed(0)+' %</strong> de tes revenus.</div>'
+    +margin+nextLine+'</div>';
+
+  // ── Bloc 2 : plus gros postes de dépenses (leviers) ──
+  const cats=cfData().expense.map(cat=>({name:cat.name||'Dépenses',val:cfCatTotal(cat,'expense'),want:cfIsWant(cat.name)}))
+    .filter(c=>c.val>0).sort((a,b)=>b.val-a.val);
+  let block2='';
+  if(cats.length){
+    const max=cats[0].val;
+    const rows=cats.slice(0,5).map(c=>{
+      const w=Math.max(6,Math.round(c.val/max*100));
+      const tag=c.want?'<span class="cf-sg-tag">souvent ajustable</span>':'';
+      return '<div class="cf-lev"><div class="cf-lev-top"><span>'+_esc(c.name)+' '+tag+'</span><span class="cf-lev-val">'+fmt(c.val)+' · '+pc(c.val)+' %</span></div>'
+        +'<div class="cf-lev-track"><div class="cf-lev-bar'+(c.want?' want':'')+'" style="width:'+w+'%;"></div></div></div>';
+    }).join('');
+    const big=cats[0];
+    const hint=big.want
+      ? 'Ton plus gros poste, <strong>'+_esc(big.name)+'</strong>, fait partie des dépenses « plaisir » : c\'est souvent là qu\'un petit ajustement se fait sans trop se priver.'
+      : '<strong>'+_esc(big.name)+'</strong> est ton plus gros poste. S\'il s\'agit d\'un essentiel (logement…), il est difficile à réduire vite ; regarde plutôt les postes marqués « souvent ajustable ».';
+    block2='<div class="cf-sg-card"><div class="cf-sg-h">🎯 Où tu as le plus de levier</div>'
+      +'<div class="cf-sg-line" style="margin-bottom:.6rem;">Tes dépenses classées par poids. Réduire les plus gros a le plus d\'effet.</div>'
+      +rows+'<div class="cf-sg-line" style="margin-top:.5rem;">'+hint+'</div></div>';
+  }
+
+  // ── Cadre / avertissement bienveillant ──
+  const note='<div class="cf-sg-foot">Ces pistes sont générales et informatives — ce ne sont pas des conseils financiers personnalisés. Garde une épargne de précaution, et dépenser pour ce qui compte vraiment pour toi reste légitime. L\'objectif est juste de voir où se trouvent tes marges de manœuvre.</div>';
+
+  host.innerHTML='<div class="cf-sg-intro"><div class="cf-sg-title">💡 Investir davantage, en douceur</div>'
+    +'<div class="cf-sg-sub">Quelques pistes pour rééquilibrer tes dépenses et orienter un peu plus vers l\'investissement, à ton rythme.</div></div>'
+    +block1+block2+note;
+}
+window.cfRenderSuggestions=cfRenderSuggestions;
+
+// ══════════ ONGLET « SÉCURITÉ » (matelas de précaution) ══════════
+function cfSetSafety(field,val){
+  const c=cfData();
+  if(field==='amount')c.safety.amount=Math.max(0,+val||0);
+  else if(field==='months')c.safety.months=Math.min(12,Math.max(1,+val||1));
+  save();cfSafetyRefresh();
+}
+window.cfSetSafety=cfSetSafety;
+
+function cfRenderSafety(){
+  const host=document.getElementById('cf-safety-body');if(!host)return;
+  const sf=cfData().safety;
+  const coupleNote=cfData().couple.enabled
+    ? '<div class="cf-sg-line" style="color:var(--text3);">En mode couple, le calcul se base sur <strong>ta part</strong> des dépenses.</div>' : '';
+  host.innerHTML='<div class="cf-sg-intro"><div class="cf-sg-title">🛡️ Mon matelas de sécurité</div>'
+    +'<div class="cf-sg-sub">Une épargne de précaution, disponible vite, pour absorber les imprévus (panne, coup dur, perte de revenu) sans toucher à tes investissements.</div></div>'
+    +'<div class="cf-sg-card">'
+      +'<div class="cf-sf-row">'
+        +'<label class="cf-sf-field"><span>Ce que tu as aujourd\'hui</span>'
+          +'<span class="cf-sf-amt"><input type="number" min="0" step="100" id="cf-sf-amount" value="'+(sf.amount||'')+'" placeholder="0" oninput="cfSetSafety(\'amount\',this.value)"/> €</span>'
+        +'</label>'
+      +'</div>'
+      +'<div class="cf-sf-slider">'
+        +'<div class="cf-sf-slider-top"><span>Objectif de couverture</span><strong id="cf-safety-monthslabel">'+sf.months+' mois</strong></div>'
+        +'<input type="range" id="cf-sf-months" min="1" max="12" step="1" value="'+sf.months+'" oninput="cfSetSafety(\'months\',this.value)"/>'
+        +'<div class="cf-sf-scale"><span>1</span><span>3</span><span>6</span><span>9</span><span>12</span></div>'
+      +'</div>'
+      +'<div class="cf-sf-target" id="cf-safety-target"></div>'
+      +'<div class="cf-sf-bar-track"><div class="cf-sf-bar" id="cf-safety-bar"></div></div>'
+      +'<div class="cf-sf-statusrow"><span class="cf-sf-status" id="cf-safety-status"></span><span class="cf-sf-cov" id="cf-safety-coverage"></span></div>'
+      +'<div class="cf-sg-line" id="cf-safety-gap" style="margin-top:.7rem;"></div>'
+      +coupleNote
+    +'</div>'
+    +'<div class="cf-sg-card"><div class="cf-sg-h">💡 Quelques repères</div>'
+      +'<div class="cf-sg-line">• Garde-le sur un support <strong>liquide et sûr</strong> (Livret A, LDDS…), <strong>séparé de tes investissements</strong> : c\'est de l\'argent qui doit être disponible tout de suite, pas exposé aux marchés.</div>'
+      +'<div class="cf-sg-line">• La fourchette courante est <strong>3 à 6 mois</strong> de dépenses. Plutôt vers 6+ si tes revenus sont irréguliers (indépendant, mono-revenu) ; 3 peut suffire si tes revenus sont très stables.</div>'
+      +'<div class="cf-sg-line">• L\'idéal se base sur tes <strong>dépenses essentielles</strong> (loyer, courses, factures), souvent un cran sous ton total — ici on prend le total, vois-le comme une marge confortable.</div>'
+      +'<div class="cf-sg-line">• L\'ordre des priorités : <strong>d\'abord constituer ce matelas</strong>, ensuite investir le surplus à long terme.</div>'
+      +'<div class="cf-sf-foot">Repères généraux et informatifs — ce ne sont pas des conseils financiers personnalisés.</div>'
+    +'</div>';
+  cfSafetyRefresh();
+}
+window.cfRenderSafety=cfRenderSafety;
+
+function cfSafetyRefresh(){
+  const fmt=v=>Math.round(v).toLocaleString('fr-FR')+' €';
+  const sf=cfData().safety;
+  const exp=cfSumCats('expense');
+  const months=sf.months,cur=sf.amount,target=exp*months;
+  const ml=document.getElementById('cf-safety-monthslabel');if(ml)ml.textContent=months+' mois';
+  const tt=document.getElementById('cf-safety-target');
+  if(tt)tt.innerHTML=exp>0
+    ? 'Objectif : <strong>'+months+' mois</strong> × '+fmt(exp)+'/mois = <strong style="color:var(--accent);">'+fmt(target)+'</strong>'
+    : 'Renseigne tes dépenses dans l\'onglet <strong>Cashflow</strong> pour calculer ton objectif.';
+  const ratio=target>0?cur/target:0;
+  const bar=document.getElementById('cf-safety-bar');
+  if(bar){bar.style.width=Math.min(100,ratio*100)+'%';
+    bar.style.background=ratio>=1?'var(--green)':ratio>=0.5?'var(--amber)':'var(--red)';}
+  const cov=exp>0?cur/exp:0;
+  const covEl=document.getElementById('cf-safety-coverage');
+  if(covEl)covEl.textContent=exp>0?('≈ '+cov.toFixed(1).replace('.0','')+' mois couverts'):'';
+  const st=document.getElementById('cf-safety-status');
+  if(st){
+    let txt='',cls='';
+    if(exp<=0){txt='—';cls='';}
+    else if(ratio>=1.5){txt='Bien au-delà';cls='over';}
+    else if(ratio>=1){txt='Complet ✓';cls='ok';}
+    else if(ratio>=0.5){txt='En bonne voie';cls='mid';}
+    else if(ratio>0){txt='À constituer';cls='low';}
+    else{txt='À démarrer';cls='low';}
+    st.textContent=txt;st.className='cf-sf-status '+cls;
+  }
+  const gapEl=document.getElementById('cf-safety-gap');
+  if(gapEl){
+    if(exp<=0){gapEl.innerHTML='';}
+    else{
+      const gap=target-cur;
+      const left=cfSumIncome()-cfSumCats('invest')-exp;
+      if(gap<=0){
+        gapEl.innerHTML='🎉 Objectif atteint — tu as de quoi tenir <strong>'+cov.toFixed(1).replace('.0','')+' mois</strong>.'
+          +(ratio>1.5?' Tu es nettement au-dessus : le surplus pourrait être <strong>investi</strong> (voir l\'onglet Suggestions).':'');
+      } else if(left>0.5){
+        gapEl.innerHTML='Il te manque <strong style="color:var(--amber);">'+fmt(gap)+'</strong> — soit <strong>~'+Math.ceil(gap/left)+' mois</strong> à '+fmt(left)+'/mois (ton reste disponible actuel).';
+      } else {
+        gapEl.innerHTML='Il te manque <strong style="color:var(--amber);">'+fmt(gap)+'</strong>. Ton budget actuel ne dégage pas de surplus mensuel — l\'onglet <strong>Suggestions</strong> peut aider à en libérer.';
+      }
+    }
+  }
+}
+window.cfSafetyRefresh=cfSafetyRefresh;
 
 // ── Réglages Cashflow ──
 function openCfSettings(){const o=document.getElementById('cf-settings-overlay');if(o)o.style.display='flex';}
@@ -919,46 +1156,55 @@ window.toggleRealNetInfo=toggleRealNetInfo;
 //     plus récent que ce qu'il a déjà vu (jamais 10 pop-up à la suite).
 // ════════════════════════════════════════════════════════════════
 const CHANGELOG=[
+  {v:'1.58.0',d:'9 juin 2026',items:[
+    '<strong>Nouvel onglet « Sécurité »</strong> dans le Cashflow : suis ton <strong>matelas de précaution</strong>. Indique ce que tu as, choisis ta couverture avec un <strong>curseur (1 à 12 mois)</strong>, et Folia calcule ton objectif à partir de tes dépenses, l\'écart restant et le <strong>temps pour le combler</strong> à ton rythme — avec une jauge de statut et quelques repères.'
+  ]},
+  {v:'1.57.0',d:'9 juin 2026',items:[
+    '<strong>Nouvel onglet « Suggestions »</strong> dans le Cashflow : une fois ton diagramme généré, un onglet apparaît en haut (et un bouton sous le diagramme) qui ouvre des <strong>pistes pour rééquilibrer tes dépenses</strong> — ton <strong>taux d\'épargne</strong> et ta marge non investie, et tes <strong>plus gros postes</strong> classés par poids pour repérer où tu as le plus de levier.',
+    'Correction d\'un <strong>défilement inutile sur l\'écran d\'accueil</strong> (le hub tient maintenant dans l\'écran).',
+    'Le sélecteur d\'outil (DCA / Cashflow) en haut à gauche passe en <strong>bulles cliquables</strong> : un seul clic pour basculer, le nom sous chaque bulle et la bulle active mise en valeur (fini le menu déroulant à deux clics).'
+  ]},
   {v:'1.56.2',d:'8 juin 2026',items:[
-    'Mêmes petites animations soignées sur l\'outil DCA : entrée en cascade des cartes au changement d\'onglet, survol des lignes du plan d\'achat et de l\'allocation, apparition animée d\'un nouvel ETF, et retour tactile sur les boutons.',
-    'Ctrl+Z fonctionne maintenant aussi pour les modifications de montants et de noms dans le Cashflow, même quand le curseur est dans un champ.',
-    'Correction du clignotement de la carte lors de l\'ajout d\'un ETF (apparition propre).'
+    'Mêmes petites <strong>animations soignées sur l\'outil DCA</strong> : entrée en cascade des cartes, survol des lignes du plan d\'achat et de l\'allocation, apparition animée d\'un nouvel ETF, et retour tactile sur les boutons.',
+    '<strong>Ctrl+Z fonctionne maintenant aussi dans le Cashflow</strong> pour les modifications de montants et de noms, même quand le curseur est dans un champ.',
+    'Correction du <strong>clignotement</strong> de la carte lors de l\'ajout d\'un ETF (apparition propre).',
+    'Quand une <strong>catégorie de dépenses est partagée en entier</strong> (mode couple), un récapitulatif affiche <strong>ta part et celle de ton/ta conjoint·e</strong> sur le total de la catégorie.'
   ]},
   {v:'1.56.1',d:'8 juin 2026',items:[
-    'Cashflow plus vivant : entrée animée des blocs à l\'ouverture, effet de survol sur les colonnes et catégories, glissement fluide des lignes lors du tri, et petit « pop » sur les boutons lien (🔗) et partage (÷).'
+    '<strong>Cashflow plus vivant</strong> : entrée animée des blocs, survol des colonnes et catégories, glissement fluide des lignes lors du tri, et petit « pop » sur les boutons lien (🔗) et partage (÷).'
   ]},
   {v:'1.56.0',d:'8 juin 2026',items:[
-    'Nouveau mode couple dans le Cashflow : renseigne le salaire de ton/ta conjoint·e, puis marque certaines dépenses comme « partagées » (bouton ÷) — ligne par ligne ou une catégorie entière d\'un coup. Folia ne compte alors que ta part, soit au pro-rata des deux salaires (celui qui gagne plus paie plus), soit selon un pourcentage que tu choisis.',
-    'L\'annulation (Ctrl+Z) et le rétablissement (Ctrl+Y) fonctionnent désormais aussi pour le Cashflow (ajouts, suppressions, partages…).'
+    '<strong>Nouveau mode couple</strong> dans le Cashflow : renseigne le <strong>salaire de ton/ta conjoint·e</strong>, puis sur chaque dépense choisis <strong>👫 partage au pro-rata</strong> des salaires ou <strong>% partage à un pourcentage défini</strong> (réglable par ligne) — tu peux mélanger les deux. Folia ne compte alors que <strong>ta part</strong>.',
+    'L\'<strong>annulation (Ctrl+Z)</strong> et le rétablissement (Ctrl+Y) fonctionnent désormais aussi pour le Cashflow.'
   ]},
   {v:'1.55.2',d:'8 juin 2026',items:[
-    'Un bouton « Notes de mise à jour » en bas de l\'écran d\'accueil : clique dessus à tout moment pour revoir toutes les nouveautés, des grosses fonctionnalités aux petits ajustements.'
+    'Un bouton <strong>« Notes de mise à jour »</strong> en bas de l\'écran d\'accueil : reviens voir toutes les nouveautés à tout moment, des grosses fonctionnalités aux petits ajustements.'
   ]},
   {v:'1.55.1',d:'8 juin 2026',items:[
-    'Cashflow : un bouton « Découvrir mon cashflow » t\'amène directement à ton taux d\'épargne et à ton diagramme de flux, d\'un défilement fluide — sans scroller jusqu\'en bas.',
-    'Le diagramme de flux s\'agrandit désormais correctement quand tu ajoutes beaucoup de lignes (plus de coupe en bas).'
+    'Cashflow : un bouton <strong>« Découvrir mon cashflow »</strong> t\'amène directement à ton taux d\'épargne et à ton diagramme de flux, d\'un défilement fluide.',
+    'Le <strong>diagramme de flux s\'agrandit</strong> correctement quand tu ajoutes beaucoup de lignes (plus de coupe en bas).'
   ]},
   {v:'1.55.0',d:'8 juin 2026',items:[
-    'Les deux outils communiquent : dans le Cashflow, nomme une ligne d\'investissement « PEA » et son montant se synchronise automatiquement avec ton épargne mensuelle du DCA. Si tu changes ce montant dans le DCA, il se met à jour ici aussi. Un bouton 🔗 permet de détacher le lien pour saisir un montant libre.'
+    '<strong>Les deux outils communiquent</strong> : dans le Cashflow, nomme une ligne d\'investissement <strong>« PEA »</strong> et son montant se <strong>synchronise avec ton épargne mensuelle du DCA</strong>. Un bouton 🔗 permet de détacher le lien pour saisir un montant libre.'
   ]},
   {v:'1.54.0',d:'8 juin 2026',items:[
-    'Gestion des données unifiée entre DCA et Cashflow : mêmes options (transfert vers un autre appareil par code, export/import fichier) dans les deux sections. À l\'import, tu choisis ce que tu reprends — DCA seulement, Cashflow seulement, ou les deux. Le code de transfert et le fichier emportent l\'ensemble de Folia.'
+    '<strong>Gestion des données unifiée</strong> entre DCA et Cashflow : transfert par code et export/import fichier dans les deux sections. À l\'import, tu choisis ce que tu reprends — <strong>DCA seulement, Cashflow seulement, ou les deux</strong>.'
   ]},
   {v:'1.53.0',d:'7 juin 2026',items:[
-    'Nouvelle section « Cashflow » : saisis tes revenus, tes investissements mensuels (par enveloppe) et tes dépenses (par catégorie, ex. Logement → Loyer + Charges), avec un modèle pré-rempli pour démarrer vite. Folia affiche ton reste disponible, ton taux d\'épargne, et un diagramme de flux qui montre visuellement où va ton argent.'
+    'Nouvelle section <strong>« Cashflow »</strong> : saisis tes revenus, tes investissements mensuels (par enveloppe) et tes dépenses (par catégorie), avec un modèle pré-rempli pour démarrer vite. Folia affiche ton <strong>reste disponible</strong>, ton <strong>taux d\'épargne</strong> et un <strong>diagramme de flux</strong>.'
   ]},
   {v:'1.52.0',d:'7 juin 2026',items:[
-    'Folia devient une boîte à outils multi-sections ! Un écran d\'accueil te permet de choisir ton outil, et un sélecteur en haut à gauche te laisse basculer à tout moment. La section « DCA sur PEA » regroupe tout ce que tu connais déjà ; une section « Cashflow » (gestion des revenus et dépenses) arrive bientôt.'
+    'Folia devient une <strong>boîte à outils multi-sections</strong> ! Un écran d\'accueil pour choisir ton outil, et un sélecteur en haut à gauche pour basculer à tout moment.'
   ]},
   {v:'1.51.0',d:'6 juin 2026',items:[
-    'Projection : nouveau curseur « Inflation » (3% par défaut). En plus de la valeur brute, la projection affiche désormais la « valeur réelle nette » — ce que ton capital vaudra vraiment en argent d\'aujourd\'hui, une fois l\'impôt PEA et l\'inflation pris en compte — avec sa courbe sur le graphique et une bulle ⓘ qui explique le calcul.'
+    'Projection : nouveau <strong>curseur « Inflation »</strong> et affichage de la <strong>« valeur réelle nette »</strong> — ce que ton capital vaudra vraiment en argent d\'aujourd\'hui, une fois l\'impôt PEA et l\'inflation pris en compte, avec sa courbe et une bulle ⓘ explicative.'
   ]},
   {v:'1.50.0',d:'6 juin 2026',items:[
-    '✨ Cette fenêtre « Quoi de neuf » : tu verras les nouveautés à chaque retour sur le site.',
-    'Synchronisation entre appareils : transfère tes données mobile ↔ PC avec un simple code, sans fichier.',
-    'Affichage mobile entièrement repensé : navigation, portefeuille et tutoriel adaptés au téléphone.',
-    'Fréquence bimensuelle (2×/mois) en plus du mensuel et de l\'hebdomadaire.',
-    'Import CSV désormais dans « Mon portefeuille », et un seul bouton de prix par groupe d\'émetteurs.'
+    '✨ Cette fenêtre <strong>« Quoi de neuf »</strong> : tu verras les nouveautés à chaque retour sur le site.',
+    '<strong>Synchronisation entre appareils</strong> : transfère tes données mobile ↔ PC avec un simple code, sans fichier.',
+    '<strong>Affichage mobile</strong> entièrement repensé : navigation, portefeuille et tutoriel adaptés au téléphone.',
+    '<strong>Fréquence bimensuelle</strong> (2×/mois) en plus du mensuel et de l\'hebdomadaire.',
+    'Import CSV déplacé dans <strong>« Mon portefeuille »</strong>, et un seul bouton de prix par groupe d\'émetteurs.'
   ]}
 ];
 
@@ -1006,7 +1252,7 @@ function showChangelogModal(entries){
     if(last&&last.d===e.d){ last.items=last.items.concat(e.items); }
     else groups.push({d:e.d,items:e.items.slice()});
   });
-  let h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem;">'
+  let h='<div style="position:sticky;top:-1.5rem;z-index:1;display:flex;align-items:center;justify-content:space-between;margin:-1.5rem -1.5rem .25rem;padding:1.5rem 1.5rem .6rem;background:var(--bg2);border-bottom:1px solid var(--border);">'
     +'<div style="font-size:15px;font-weight:600;">&#10024; Quoi de neuf</div>'
     +'<button id="cl-close" style="background:transparent;border:none;color:var(--text3);font-size:20px;padding:2px 8px;cursor:pointer;">&#215;</button></div>';
   groups.forEach(g=>{
@@ -1016,7 +1262,9 @@ function showChangelogModal(entries){
     g.items.forEach(it=>{ h+='<li style="font-size:12px;color:var(--text2);line-height:1.45;">'+it+'</li>'; });
     h+='</ul></div>';
   });
-  h+='<button id="cl-ok" class="btn-add" style="width:100%;margin-top:1rem;">Super, merci !</button>';
+  h+='<div style="position:sticky;bottom:-1.5rem;margin:.25rem -1.5rem -1.5rem;padding:1rem 1.5rem;background:var(--bg2);border-top:1px solid var(--border);">'
+    +'<button id="cl-ok" class="btn-add" style="width:100%;margin:0;">Super, merci !</button>'
+    +'</div>';
   box.innerHTML=h;ov.appendChild(box);
   const close=()=>{ov.remove();document.removeEventListener('keydown',onKey);};
   const onKey=ev=>{if(ev.key==='Escape')close();};
@@ -1590,11 +1838,11 @@ function addEtfBlankAndScroll(){
   state.etfs.push({id,name:'',ticker:'',isin:'',target:0,shares:0,avgPrice:0});
   _newEtfId=id;             // la carte s'animera dès sa création (pas de clignotement)
   save();renderEtfGrid();
-  setTimeout(()=>{
+  requestAnimationFrame(()=>{
     const card=document.getElementById('etf-card-'+id);
     if(card){card.scrollIntoView({behavior:'smooth',block:'center'});
-      const inp=document.getElementById('ident-'+id);if(inp)inp.focus();}
-  },80);
+      const inp=document.getElementById('ident-'+id);if(inp)inp.focus({preventScroll:true});}
+  });
 }
 window.addEtfBlankAndScroll=addEtfBlankAndScroll;
 // Archive l'identité d'un ETF supprimé dans la bibliothèque (récupérable ensuite).
@@ -1722,10 +1970,7 @@ function renderEtfGrid(){
           +'<div style="margin-top:6px;text-align:right;font-size:11px;font-family:var(--mono);color:'+(subVal>0?'var(--text2)':'var(--text3)')+';" id="sub-val-'+eid+'-'+si+'">'+(subVal>0?'= '+subVal.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €':'= — €')+'</div>'
           +'</div>';
       });
-      subsBody+='<div style="display:flex;gap:6px;">'
-        +'<button onclick="addSubEtf('+eid+')" style="background:transparent;border:1px dashed var(--border2);color:var(--text3);font-size:11px;font-family:var(--mono);padding:6px;border-radius:var(--r);flex:1;cursor:pointer;" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'\';this.style.color=\'var(--text3)\'">+ Ajouter un émetteur</button>'
-        +'<button onclick="resolveGroup('+eid+')" title="Récupérer les prix de tous les émetteurs" style="background:transparent;border:1px solid var(--border2);color:var(--text2);font-size:11px;font-family:var(--mono);padding:6px 10px;border-radius:var(--r);cursor:pointer;white-space:nowrap;" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border2)\';this.style.color=\'var(--text2)\'">⟳ Prix du groupe</button>'
-        +'</div>';
+      subsBody+='<button onclick="addSubEtf('+eid+')" style="background:transparent;border:1px dashed var(--border2);color:var(--text3);font-size:11px;font-family:var(--mono);padding:6px;border-radius:var(--r);width:100%;cursor:pointer;" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'\';this.style.color=\'var(--text3)\'">+ Ajouter un émetteur</button>';
       subsBody+='</div>';
     }
 
@@ -1753,10 +1998,11 @@ function renderEtfGrid(){
         +'<button onclick="addSubEtf('+eid+')" style="background:transparent;border:1px dashed var(--border2);color:var(--text3);font-size:11px;font-family:var(--mono);padding:5px;border-radius:var(--r);width:100%;cursor:pointer;" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'\';this.style.color=\'var(--text3)\'">+ Ajouter un émetteur alternatif</button>'
         +'</div>';
     } else {
-      // ETF groupe — cible % + subs
-      body+='<div class="etf-field target-field"><label>Cible %</label><input type="number" class="etf-target-input" value="'+etf.target+'" min="0" max="100" oninput="setEtfField('+eid+',&quot;target&quot;,this.value)"/></div>'
-        +'<div class="etf-field" style="display:flex;align-items:center;gap:6px;">'
-        +'<div style="font-size:11px;font-family:var(--mono);color:var(--text2);">'+etf.subs.length+' émetteur'+(etf.subs.length>1?'s':'')+' · '+(val>0?val.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €':'— €')+'</div>'
+      // ETF groupe — cible % + bouton « Prix du groupe » sur la MÊME ligne (en haut), puis émetteurs
+      body+='<div style="grid-column:1/-1;display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">'
+        +'<div class="etf-field target-field" style="width:96px;flex-shrink:0;"><label>Cible %</label><input type="number" class="etf-target-input" value="'+etf.target+'" min="0" max="100" oninput="setEtfField('+eid+',&quot;target&quot;,this.value)"/></div>'
+        +'<div style="font-size:11px;font-family:var(--mono);color:var(--text2);padding-bottom:9px;flex:1;min-width:80px;">'+etf.subs.length+' émetteur'+(etf.subs.length>1?'s':'')+' · '+(val>0?val.toLocaleString('fr-FR',{maximumFractionDigits:0})+' €':'— €')+'</div>'
+        +'<button onclick="resolveGroup('+eid+')" title="Récupérer les prix de tous les émetteurs" style="margin-bottom:4px;background:transparent;border:1px solid var(--border2);color:var(--text2);font-size:11px;font-family:var(--mono);padding:6px 10px;border-radius:var(--r);cursor:pointer;white-space:nowrap;" onmouseover="this.style.borderColor=\'var(--accent)\';this.style.color=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border2)\';this.style.color=\'var(--text2)\'">⟳ Prix du groupe</button>'
         +'</div>'
         +subsBody;
     }
@@ -1798,6 +2044,11 @@ function refreshAllocTotal(){
   _sortTimer=setTimeout(()=>{
     const grid=document.getElementById('etf-grid');if(!grid)return;
     const sorted=[...state.etfs].sort((a,b)=>b.target-a.target);
+    // Si la grille est DÉJÀ dans le bon ordre (cas d'un rendu complet, déjà trié),
+    // on ne ré-attache rien : inutile, et ça évitait un clignotement ~1 s après.
+    const want=sorted.map(e=>'etf-card-'+e.id).join(',');
+    const cur=[...grid.children].map(c=>c.id).join(',');
+    if(cur===want)return;
     // FLIP : mesure positions avant
     const before={};
     sorted.forEach(etf=>{
