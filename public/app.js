@@ -30,25 +30,39 @@ const COLORS=['#4f8ef7','#34d399','#f97316','#a78bfa','#2dd4bf','#fbbf24','#f871
 // Bibliothèque de base : ETF PEA courants proposés par défaut. La bibliothèque
 // complète (voir buildEtfLibrary) ajoute aussi les ETF que l'utilisateur a déjà
 // utilisés ou supprimés, pour qu'il reste dans un environnement familier.
+// Données de composition indicatives par famille d'indice (géographie et secteurs).
+// Sources : MSCI, S&P, Stoxx — valeurs arrondies, à titre informatif.
+const _COMP={
+  'msci-world':{geo:{usa:71,europe:15,japon:6,emergents:0,autre:8},sectors:{tech:25,finance:15,sante:13,industrie:10,conso:11,energie:5,autre:21}},
+  'sp500':     {geo:{usa:100,europe:0,japon:0,emergents:0,autre:0},sectors:{tech:31,finance:13,sante:12,industrie:9,conso:10,energie:4,autre:21}},
+  'nasdaq100': {geo:{usa:97,europe:0,japon:0,emergents:0,autre:3}, sectors:{tech:50,finance:5,sante:7,industrie:5,conso:18,energie:1,autre:14}},
+  'em':        {geo:{usa:0,europe:0,japon:0,emergents:96,autre:4}, sectors:{tech:24,finance:22,sante:5,industrie:7,conso:12,energie:5,autre:25}},
+  'russell2000':{geo:{usa:100,europe:0,japon:0,emergents:0,autre:0},sectors:{tech:14,finance:18,sante:17,industrie:16,conso:9,energie:4,autre:22}},
+  'europe':    {geo:{usa:0,europe:100,japon:0,emergents:0,autre:0},sectors:{tech:10,finance:18,sante:14,industrie:15,conso:13,energie:7,autre:23}},
+  'eurostoxx': {geo:{usa:0,europe:100,japon:0,emergents:0,autre:0},sectors:{tech:10,finance:20,sante:12,industrie:13,conso:13,energie:9,autre:23}},
+  'cac40':     {geo:{usa:0,europe:100,japon:0,emergents:0,autre:0},sectors:{tech:8,finance:16,sante:12,industrie:14,conso:20,energie:8,autre:22}},
+  'india':     {geo:{usa:0,europe:0,japon:0,emergents:100,autre:0},sectors:{tech:18,finance:25,sante:8,industrie:8,conso:10,energie:12,autre:19}},
+  'stoxx600':  {geo:{usa:0,europe:100,japon:0,emergents:0,autre:0},sectors:{tech:10,finance:18,sante:13,industrie:15,conso:12,energie:7,autre:25}},
+};
 const BASE_ETF_LIBRARY=[
-  {name:'Amundi MSCI World',ticker:'CW8.PA',isin:'LU0996182563'},
-  {name:'Amundi MSCI World (PEA)',ticker:'WPEA.PA',isin:'IE0002XZSHO1'},
-  {name:'Lyxor MSCI World',ticker:'EWLD.PA',isin:'FR0011869353'},
-  {name:'Amundi S&P 500',ticker:'500.PA',isin:'LU1681048804'},
-  {name:'Amundi PEA S&P 500',ticker:'PE500.PA',isin:'FR0013412285'},
-  {name:'BNP Paribas Easy S&P 500',ticker:'ESE.PA',isin:'FR0011550185'},
-  {name:'Amundi NASDAQ-100',ticker:'ANX.PA',isin:'LU1681038243'},
-  {name:'Amundi PEA Nasdaq-100',ticker:'PUST.PA',isin:'FR0011871110'},
-  {name:'Amundi MSCI Emerging Markets',ticker:'PAEEM.PA',isin:'LU1681045370'},
-  {name:'iShares Russell 2000',ticker:'RS2K.PA',isin:'IE00B3VVMM84'},
-  {name:'Amundi PEA MSCI Emerging Markets',ticker:'PAEEM.PA',isin:'LU1681045370'},
-  {name:'Amundi MSCI Europe',ticker:'CEU.PA',isin:'LU1681042609'},
-  {name:'Lyxor PEA Eurozone (Euro Stoxx 50)',ticker:'MSE.PA',isin:'FR0011869320'},
-  {name:'Amundi CAC 40',ticker:'C40.PA',isin:'FR0007052782'},
-  {name:'Amundi PEA Monde (MSCI World)',ticker:'CW8.PA',isin:'FR001400U5Q4'},
-  {name:'Amundi MSCI India',ticker:'INR.PA',isin:'LU1681045370'},
-  {name:'BNP Paribas Easy Stoxx Europe 600',ticker:'ETZ.PA',isin:'FR0011550193'},
-  {name:'Amundi Euro Stoxx 50',ticker:'C50.PA',isin:'FR0007054358'},
+  {name:'Amundi MSCI World',           ticker:'CW8.PA',  isin:'LU0996182563', comp:_COMP['msci-world']},
+  {name:'Amundi MSCI World (PEA)',     ticker:'WPEA.PA', isin:'IE0002XZSHO1', comp:_COMP['msci-world']},
+  {name:'Lyxor MSCI World',            ticker:'EWLD.PA', isin:'FR0011869353', comp:_COMP['msci-world']},
+  {name:'Amundi S&P 500',              ticker:'500.PA',  isin:'LU1681048804', comp:_COMP['sp500']},
+  {name:'Amundi PEA S&P 500',          ticker:'PE500.PA',isin:'FR0013412285', comp:_COMP['sp500']},
+  {name:'BNP Paribas Easy S&P 500',    ticker:'ESE.PA',  isin:'FR0011550185', comp:_COMP['sp500']},
+  {name:'Amundi NASDAQ-100',           ticker:'ANX.PA',  isin:'LU1681038243', comp:_COMP['nasdaq100']},
+  {name:'Amundi PEA Nasdaq-100',       ticker:'PUST.PA', isin:'FR0011871110', comp:_COMP['nasdaq100']},
+  {name:'Amundi MSCI Emerging Markets',ticker:'PAEEM.PA',isin:'LU1681045370', comp:_COMP['em']},
+  {name:'iShares Russell 2000',        ticker:'RS2K.PA', isin:'IE00B3VVMM84', comp:_COMP['russell2000']},
+  {name:'Amundi PEA MSCI Emerging Markets',ticker:'PAEEM.PA',isin:'LU1681045370',comp:_COMP['em']},
+  {name:'Amundi MSCI Europe',          ticker:'CEU.PA',  isin:'LU1681042609', comp:_COMP['europe']},
+  {name:'Lyxor PEA Eurozone (Euro Stoxx 50)',ticker:'MSE.PA',isin:'FR0011869320',comp:_COMP['eurostoxx']},
+  {name:'Amundi CAC 40',               ticker:'C40.PA',  isin:'FR0007052782', comp:_COMP['cac40']},
+  {name:'Amundi PEA Monde (MSCI World)',ticker:'CW8.PA', isin:'FR001400U5Q4', comp:_COMP['msci-world']},
+  {name:'Amundi MSCI India',           ticker:'INR.PA',  isin:'LU1629377730', comp:_COMP['india']},
+  {name:'BNP Paribas Easy Stoxx Europe 600',ticker:'ETZ.PA',isin:'FR0011550193',comp:_COMP['stoxx600']},
+  {name:'Amundi Euro Stoxx 50',        ticker:'C50.PA',  isin:'FR0007054358', comp:_COMP['eurostoxx']},
 ];
 const INDEX_KEYWORDS=['MSCI World','S&P 500','Russell 2000','Emerging Market','NASDAQ','CAC 40','DAX','Euro Stoxx'];
 function load(){try{const d=localStorage.getItem('folia_v3');return d?JSON.parse(d):null;}catch(e){return null;}}
@@ -1156,6 +1170,12 @@ window.toggleRealNetInfo=toggleRealNetInfo;
 //     plus récent que ce qu'il a déjà vu (jamais 10 pop-up à la suite).
 // ════════════════════════════════════════════════════════════════
 const CHANGELOG=[
+  {v:'1.59.0',d:'12 juin 2026',items:[
+    '<strong>Nouveau panneau « Exposition du portefeuille »</strong> dans l\'onglet Mon portefeuille : Folia calcule l\'exposition géographique (<strong>États-Unis, Europe, Japon, Marchés émergents…</strong>) et sectorielle (<strong>Tech, Finance, Santé, Industrie…</strong>) de ton portefeuille, pondérée par tes allocations cibles. Les données sont <strong>indicatives</strong>, basées sur la composition des indices suivis par tes ETF.',
+    '<strong>Nouvelle disposition de l\'onglet Mon portefeuille</strong> : tes ETF s\'affichent <strong>3 par rangée</strong> au centre, avec le panneau Exposition fixé à droite qui t\'accompagne pendant le défilement.',
+    'Les <strong>marges latérales de toutes les pages sont réduites</strong> : plus de place pour le contenu, surtout sur grand écran.',
+    '<strong>Améliorations sur mobile</strong> : boutons du Cashflow (supprimer, lier, partager) <strong>plus grands pour le pouce</strong>, cartes de l\'écran d\'accueil adaptées à la largeur, exposition en deux colonnes sur tablette, et des <strong>ombres latérales sur le diagramme de flux</strong> qui montrent qu\'on peut le faire défiler.'
+  ]},
   {v:'1.58.0',d:'9 juin 2026',items:[
     '<strong>Nouvel onglet « Sécurité »</strong> dans le Cashflow : suis ton <strong>matelas de précaution</strong>. Indique ce que tu as, choisis ta couverture avec un <strong>curseur (1 à 12 mois)</strong>, et Folia calcule ton objectif à partir de tes dépenses, l\'écart restant et le <strong>temps pour le combler</strong> à ton rythme — avec une jauge de statut et quelques repères.'
   ]},
@@ -1594,6 +1614,64 @@ function renderDeltaChip(etf){
   const s=pct>=0?'+':'';const cls=pct>=0?'up':'down';const arrow=pct>=0?'▲':'▼';
   return'<span class="price-chip '+cls+'">'+arrow+' '+s+pct.toFixed(2)+'%</span>';
 }
+// ══════════ EXPOSITION DU PORTEFEUILLE ══════════
+function renderExposure(){
+  const el=document.getElementById('exposure-content');if(!el)return;
+  // Construit un index ticker/isin → composition depuis la bibliothèque
+  const look={};
+  BASE_ETF_LIBRARY.forEach(lib=>{
+    if(!lib.comp)return;
+    if(lib.ticker)look[lib.ticker]=lib.comp;
+    if(lib.isin)look[lib.isin]=lib.comp;
+  });
+  const gKeys=['usa','europe','japon','emergents','autre'];
+  const sKeys=['tech','finance','sante','industrie','conso','energie','autre'];
+  const gAcc={};gKeys.forEach(k=>gAcc[k]=0);
+  const sAcc={};sKeys.forEach(k=>sAcc[k]=0);
+  let matchedW=0,totalW=0;
+  state.etfs.forEach(etf=>{
+    const w=+etf.target||0;if(!w)return;
+    totalW+=w;
+    // Priorité ticker, puis ISIN
+    const comp=look[etf.ticker]||look[etf.isin];if(!comp)return;
+    matchedW+=w;
+    gKeys.forEach(k=>gAcc[k]+=(comp.geo[k]||0)*w);
+    sKeys.forEach(k=>sAcc[k]+=(comp.sectors[k]||0)*w);
+  });
+  if(!matchedW){
+    el.innerHTML='<p style="font-size:12px;color:var(--text3);text-align:center;padding:8px 0;">Aucun ETF reconnu dans la bibliothèque — ajoute tes ETF via la bibliothèque pour voir l\'exposition.</p>';
+    return;
+  }
+  // Moyennes pondérées
+  const gN={};gKeys.forEach(k=>gN[k]=gAcc[k]/matchedW);
+  const sN={};sKeys.forEach(k=>sN[k]=sAcc[k]/matchedW);
+
+  const gLabels={usa:'États-Unis',europe:'Europe',japon:'Japon & Pacif.',emergents:'Marchés émergents',autre:'Autre'};
+  const sLabels={tech:'Tech & IT',finance:'Finance',sante:'Santé',industrie:'Industrie',conso:'Consommation',energie:'Énergie',autre:'Autre'};
+  const gColors={usa:'#4f8ef7',europe:'#34d399',japon:'#f97316',emergents:'#a78bfa',autre:'#94a3b8'};
+  const sColors={tech:'#4f8ef7',finance:'#34d399',sante:'#2dd4bf',industrie:'#f97316',conso:'#fbbf24',energie:'#f87171',autre:'#94a3b8'};
+
+  function bars(keys,vals,labels,colors){
+    return keys
+      .map(k=>({k,v:vals[k]}))
+      .filter(x=>x.v>=0.5)
+      .sort((a,b)=>b.v-a.v)
+      .map(({k,v})=>'<div class="exp-row">'
+        +'<span class="exp-label">'+labels[k]+'</span>'
+        +'<div class="exp-bar-wrap"><div class="exp-bar" style="width:'+Math.min(v,100).toFixed(1)+'%;background:'+colors[k]+';"></div></div>'
+        +'<span class="exp-pct">'+v.toFixed(0)+'%</span>'
+        +'</div>').join('');
+  }
+  const note=matchedW<totalW
+    ?'<p style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:10px;text-align:center;">Basé sur '+matchedW.toFixed(0)+'% de l\'allocation (ETF hors bibliothèque ignorés).</p>'
+    :'';
+  el.innerHTML='<div class="exp-grid">'
+    +'<div><div class="exp-title">Géographie</div>'+bars(gKeys,gN,gLabels,gColors)+'</div>'
+    +'<div><div class="exp-title">Secteurs</div>'+bars(sKeys,sN,sLabels,sColors)+'</div>'
+    +'</div>'+note;
+}
+window.renderExposure=renderExposure;
+
 let pieChart=null;
 function renderPieChart(){
   const ctx=document.getElementById('pie-main');const infoEl=document.getElementById('pie-info');if(!ctx)return;
@@ -1869,6 +1947,7 @@ function syncAllViews(){
   updateHealthBar();
   renderAllocOverview();
   renderPieChart();
+  renderExposure();
   updateOnboarding();
   // Mettre à jour tous les footers de cards portefeuille
   state.etfs.forEach(e=>{
@@ -2029,6 +2108,7 @@ function renderEtfGrid(){
   });
   _newEtfId=null; // marqueur consommé
   refreshAllocTotal();
+  renderExposure();
 }
 let _sortTimer=null;
 function refreshAllocTotal(){

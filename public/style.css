@@ -37,7 +37,7 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 .health-value{font-size:15px;font-weight:600;font-family:var(--mono);}
 .health-value.green{color:var(--green);}.health-value.amber{color:var(--amber);}.health-value.blue{color:var(--accent);}.health-value.red{color:var(--red);}
 .reminder-banner{margin-left:auto;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.25);color:var(--amber);border-radius:var(--r);padding:5px 12px;font-size:11px;font-family:var(--mono);display:flex;align-items:center;gap:7px;cursor:pointer;}
-.page{max-width:1400px;margin:0 auto;padding:1.5rem 2rem;display:none;}.page.active{display:block;}
+.page{max-width:1600px;margin:0 auto;padding:1.5rem 1rem;display:none;}.page.active{display:block;}
 .card{position:relative;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:1.2rem 1.4rem;margin-bottom:1rem;}
 /* Spotlight très subtil qui suit la souris (effet 7, dosé discret) */
 .card.spotlight::before{content:'';position:absolute;inset:0;border-radius:inherit;opacity:0;transition:opacity .3s ease;background:radial-gradient(380px circle at var(--mx,50%) var(--my,50%),rgba(79,142,247,.06),transparent 60%);pointer-events:none;z-index:0;}
@@ -93,13 +93,16 @@ button{font-family:var(--font);cursor:pointer;border-radius:var(--r);border:none
 .alloc-layout{display:flex;flex-direction:column;gap:1rem;align-items:stretch;}
 .alloc-pie{flex-shrink:0;width:100%;display:flex;flex-direction:column;align-items:center;}
 .alloc-list{flex:1;min-width:0;}
-.portfolio-layout{display:grid;grid-template-columns:270px 1fr;gap:1.25rem;align-items:start;}
+/* Colonne centrale = toujours 3 cartes ETF par rangée ; l'Exposition prend
+   l'espace restant à droite. La page garde le même plafond (1400px) que les autres. */
+.portfolio-layout{display:grid;grid-template-columns:270px minmax(0,3fr) minmax(0,1fr);gap:1.25rem;align-items:start;}
 .portfolio-left{position:sticky;top:70px;display:flex;flex-direction:column;gap:.75rem;}
+.portfolio-expose{position:sticky;top:70px;}
 .form-group{display:flex;flex-direction:column;gap:5px;}
 .form-group label{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em;}
 .form-group input,.form-group select{width:100%;padding:7px 11px;height:34px;font-size:13px;}
 .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.etf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem;}
+.etf-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;}
 .etf-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:1.1rem 1.3rem;transition:border-color .2s,transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s ease;}
 .etf-card:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 6px 20px -8px rgba(0,0,0,.5);}
 .etf-card-header{display:flex;align-items:center;gap:8px;margin-bottom:.85rem;}
@@ -240,7 +243,12 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 @media(max-width:900px){
   /* La colonne de réglages passe au-dessus de la grille d'ETF, sans sticky. */
   .portfolio-layout{grid-template-columns:1fr;}
-  .portfolio-left{position:static;top:auto;}
+  .portfolio-left,.portfolio-expose{position:static;top:auto;}
+  /* Sous 900px, 2 cartes ETF par rangée suffisent (3 seraient trop étroites). */
+  .etf-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  /* L'Exposition passe en pleine largeur sous la grille : Géographie et
+     Secteurs côte à côte plutôt qu'une longue pile de barres étirées. */
+  .exp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px 24px;}
   /* Un peu moins de marge sur les pages pour gagner de la largeur. */
   .page{padding:1.25rem 1.25rem;}
   .health-bar{gap:1.1rem;}
@@ -273,7 +281,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
   /* — Mise en page principale : tout en une colonne — */
   .flow-layout{grid-template-columns:1fr;gap:1rem;}
   .portfolio-layout{grid-template-columns:1fr;}
-  .portfolio-left{position:static;top:auto;}
+  .portfolio-left,.portfolio-expose{position:static;top:auto;}
 
   /* — Grille d'ETF : une seule colonne (le minmax fixe débordait) — */
   .etf-grid{grid-template-columns:1fr;}
@@ -289,6 +297,27 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
   .btn-sm{height:38px;}
   .btn-primary,.btn-ghost,.btn-calc,.btn-confirm,.btn-save-parts{padding:11px 16px;font-size:13px;}
   .day-cell{padding:9px 0;font-size:13px;} /* sélecteur de jour plus tapable */
+
+  /* — Cashflow : boutons de ligne (×, 🔗, ÷) agrandis pour le pouce — */
+  .cf-del,.cf-link,.cf-split{width:38px;height:38px;font-size:15px;}
+  .cf-row input.cf-amt{width:88px;height:38px;}
+  .cf-row input.cf-name{height:38px;}
+  .cf-add{padding:11px;font-size:12px;}
+  .cf-add-item{padding:9px 0 4px .5rem;font-size:11px;}
+
+  /* — Hub : les cartes occupent la largeur plutôt qu'un bloc fixe 280px — */
+  .hub-card{width:100%;max-width:340px;}
+
+  /* — Sankey : ombres latérales qui signalent qu'on peut faire défiler,
+       et qui disparaissent une fois arrivé au bout (background-attachment) — */
+  #cf-sankey-wrap{
+    background:
+      linear-gradient(90deg,var(--bg2) 0%,rgba(21,22,25,0) 100%) left/20px 100% no-repeat,
+      linear-gradient(270deg,var(--bg2) 0%,rgba(21,22,25,0) 100%) right/20px 100% no-repeat,
+      radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.45),transparent) left/10px 100% no-repeat,
+      radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.45),transparent) right/10px 100% no-repeat;
+    background-attachment:local,local,scroll,scroll;
+  }
 
   /* — Métriques de projection : 2 par ligne max — */
   .metrics-row{grid-template-columns:1fr 1fr;}
@@ -519,3 +548,12 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 .cf-sf-status.over{color:var(--accent);border-color:rgba(79,142,247,.4);background:rgba(79,142,247,.10);}
 .cf-sf-cov{font-size:11px;color:var(--text3);font-family:var(--mono);}
 .cf-sf-foot{font-size:10.5px;color:var(--text3);font-family:var(--mono);line-height:1.6;border-top:1px solid var(--border);padding-top:.8rem;margin-top:.6rem;}
+
+/* ── Exposition du portefeuille ── */
+.exp-grid{display:flex;flex-direction:column;gap:14px;}
+.exp-title{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px;}
+.exp-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+.exp-label{font-size:11px;color:var(--text2);width:122px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.exp-bar-wrap{flex:1;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;min-width:20px;}
+.exp-bar{height:100%;border-radius:2px;transition:width .45s cubic-bezier(.22,1,.36,1);}
+.exp-pct{font-size:10px;font-family:var(--mono);color:var(--text3);min-width:26px;text-align:right;}
