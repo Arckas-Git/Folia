@@ -650,11 +650,11 @@ function renderSankey(){
   const allocated=cats.reduce((s,c)=>s+c.value,0);
   const reste=Math.max(0,T-allocated);
   // ── Géométrie ──
-  const W=900,nodeW=13,G=12,PAD=12,MINH=4;
+  const W=900,nodeW=13,G=10,PAD=12,MINH=4;
   const colX=[6,250,500,W-nodeW-6]; // x gauche de chaque colonne
   const n2=cats.length+(reste>0?1:0),n3=cats.reduce((s,c)=>s+c.items.length,0);
   // Échelle proportionnelle : la plus grande colonne (somme T) occupe ~VHEIGHT px.
-  const VHEIGHT=340;
+  const VHEIGHT=280;
   let scale=T>0?VHEIGHT/T:0.1;
   const hOf=v=>Math.max(MINH,v*scale); // plancher pour que les petites lignes restent visibles
   // Hauteurs par colonne
@@ -1170,6 +1170,9 @@ window.toggleRealNetInfo=toggleRealNetInfo;
 //     plus récent que ce qu'il a déjà vu (jamais 10 pop-up à la suite).
 // ════════════════════════════════════════════════════════════════
 const CHANGELOG=[
+  {v:'1.59.1',d:'12 juin 2026',items:[
+    'Le <strong>diagramme de flux est plus compact</strong> : il tient maintenant entièrement dans l\'écran, sans avoir à faire défiler pour voir les derniers postes.'
+  ]},
   {v:'1.59.0',d:'12 juin 2026',items:[
     '<strong>Nouveau panneau « Exposition du portefeuille »</strong> dans l\'onglet Mon portefeuille : Folia calcule l\'exposition géographique (<strong>États-Unis, Europe, Japon, Marchés émergents…</strong>) et sectorielle (<strong>Tech, Finance, Santé, Industrie…</strong>) de ton portefeuille, pondérée par tes allocations cibles. Les données sont <strong>indicatives</strong>, basées sur la composition des indices suivis par tes ETF.',
     '<strong>Nouvelle disposition de l\'onglet Mon portefeuille</strong> : tes ETF s\'affichent <strong>3 par rangée</strong> au centre, avec le panneau Exposition fixé à droite qui t\'accompagne pendant le défilement.',
