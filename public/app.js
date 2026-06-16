@@ -846,7 +846,7 @@ function cfRenderSafety(){
       +'<div class="cf-sf-slider">'
         +'<div class="cf-sf-slider-top"><span>Objectif de couverture</span><strong id="cf-safety-monthslabel">'+sf.months+' mois</strong></div>'
         +'<input type="range" id="cf-sf-months" min="1" max="12" step="1" value="'+sf.months+'" oninput="cfSetSafety(\'months\',this.value)"/>'
-        +'<div class="cf-sf-scale"><span>1</span><span>3</span><span>6</span><span>9</span><span>12</span></div>'
+        +'<div class="cf-sf-scale"><span style="left:0%">1</span><span style="left:18.18%">3</span><span style="left:45.45%">6</span><span style="left:72.73%">9</span><span style="left:100%">12</span></div>'
       +'</div>'
       +'<div class="cf-sf-target" id="cf-safety-target"></div>'
       +'<div class="cf-sf-bar-track"><div class="cf-sf-bar" id="cf-safety-bar"></div></div>'
@@ -898,14 +898,28 @@ function cfSafetyRefresh(){
     if(exp<=0){gapEl.innerHTML='';}
     else{
       const gap=target-cur;
-      const left=cfSumIncome()-cfSumCats('invest')-exp;
+      const income=cfSumIncome();
+      const invest=cfSumCats('invest');
+      const left=income-invest-exp;   // reste mensuel en continuant d'investir
+      const priority=income-exp;      // reste mensuel si on met l'investissement en pause (matelas d'abord)
       if(gap<=0){
         gapEl.innerHTML='🎉 Objectif atteint — tu as de quoi tenir <strong>'+cov.toFixed(1).replace('.0','')+' mois</strong>.'
           +(ratio>1.5?' Tu es nettement au-dessus : le surplus pourrait être <strong>investi</strong> (voir l\'onglet Suggestions).':'');
-      } else if(left>0.5){
-        gapEl.innerHTML='Il te manque <strong style="color:var(--amber);">'+fmt(gap)+'</strong> — soit <strong>~'+Math.ceil(gap/left)+' mois</strong> à '+fmt(left)+'/mois (ton reste disponible actuel).';
+      } else if(priority>0.5){
+        let html='Il te manque <strong style="color:var(--amber);">'+fmt(gap)+'</strong>.';
+        if(invest>0.5){
+          // Deux scénarios : matelas prioritaire (investissement en pause) vs rythme actuel.
+          html+='<br>• <strong>~'+Math.ceil(gap/priority)+' mois</strong> en priorisant ton matelas — à '+fmt(priority)+'/mois, investissement mis en pause.';
+          html+= left>0.5
+            ? '<br>• <strong>~'+Math.ceil(gap/left)+' mois</strong> à ton rythme actuel — à '+fmt(left)+'/mois, en continuant d\'investir '+fmt(invest)+'.'
+            : '<br>• À ton rythme actuel, ton budget ne dégage presque rien pour le matelas (tu investis '+fmt(invest)+'/mois).';
+        } else {
+          // Rien à mettre en pause : un seul chiffre.
+          html+=' Soit <strong>~'+Math.ceil(gap/priority)+' mois</strong> à '+fmt(priority)+'/mois (ton reste disponible).';
+        }
+        gapEl.innerHTML=html;
       } else {
-        gapEl.innerHTML='Il te manque <strong style="color:var(--amber);">'+fmt(gap)+'</strong>. Ton budget actuel ne dégage pas de surplus mensuel — l\'onglet <strong>Suggestions</strong> peut aider à en libérer.';
+        gapEl.innerHTML='Il te manque <strong style="color:var(--amber);">'+fmt(gap)+'</strong>. Même sans investir, ton budget ne dégage pas de surplus mensuel — l\'onglet <strong>Suggestions</strong> peut aider à en libérer.';
       }
     }
   }
@@ -990,6 +1004,10 @@ function doUndo(){
     save();
     renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();
     if(typeof renderCashflow==='function')renderCashflow();
+    // Les sous-onglets Cashflow (Sécurité, Suggestions) ne sont pas redessinés par
+    // renderCashflow : on les rafraîchit ici pour que Ctrl+Z s'y reflète aussi.
+    if(typeof cfRenderSafety==='function')cfRenderSafety();
+    if(typeof cfRenderSuggestions==='function')cfRenderSuggestions();
     const pp=document.getElementById('page-projection');if(pp&&pp.classList.contains('active'))updateProj();
     toast('Annulé : '+entry.label);
   }catch(e){toast('Échec de l\'annulation');}
@@ -1008,6 +1026,8 @@ function doRedo(){
     save();
     renderEtfGrid();renderAllocOverview();renderPieChart();updateHealthBar();renderQuickUpdate();renderMonthly();renderHistory();updateOnboarding();
     if(typeof renderCashflow==='function')renderCashflow();
+    if(typeof cfRenderSafety==='function')cfRenderSafety();
+    if(typeof cfRenderSuggestions==='function')cfRenderSuggestions();
     const pp=document.getElementById('page-projection');if(pp&&pp.classList.contains('active'))updateProj();
     toast('Rétabli : '+entry.label);
   }catch(e){toast('Échec du rétablissement');}
@@ -1171,7 +1191,11 @@ window.toggleRealNetInfo=toggleRealNetInfo;
 // ════════════════════════════════════════════════════════════════
 const CHANGELOG=[
   {v:'1.59.1',d:'12 juin 2026',items:[
-    'Le <strong>diagramme de flux est plus compact</strong> : il tient maintenant entièrement dans l\'écran, sans avoir à faire défiler pour voir les derniers postes.'
+    'Le <strong>diagramme de flux est plus compact</strong> : il tient maintenant entièrement dans l\'écran, sans avoir à faire défiler pour voir les derniers postes.',
+    'Onglet <strong>Sécurité</strong> : le montant que tu as aujourd\'hui s\'affiche dans un champ plus compact, aligné à gauche, et les nombres de mois sous le curseur sont enfin <strong>bien alignés</strong> avec la position du curseur.',
+    'L\'<strong>annulation (Ctrl+Z)</strong> et le rétablissement (Ctrl+Y) fonctionnent désormais aussi dans l\'onglet Sécurité.',
+    'Onglet Sécurité : le <strong>délai pour combler ton matelas</strong> est désormais plus réaliste. Folia affiche <strong>deux estimations</strong> — le nombre de mois <strong>en priorisant ton matelas</strong> (investissement mis en pause, comme le recommandent les repères) et le nombre de mois <strong>à ton rythme actuel</strong> (en continuant d\'investir). Fini les délais absurdes quand tu investis beaucoup.',
+    'Petits réglages de lisibilité : le <strong>gras</strong> des textes du Cashflow est un peu plus léger.'
   ]},
   {v:'1.59.0',d:'12 juin 2026',items:[
     '<strong>Nouveau panneau « Exposition du portefeuille »</strong> dans l\'onglet Mon portefeuille : Folia calcule l\'exposition géographique (<strong>États-Unis, Europe, Japon, Marchés émergents…</strong>) et sectorielle (<strong>Tech, Finance, Santé, Industrie…</strong>) de ton portefeuille, pondérée par tes allocations cibles. Les données sont <strong>indicatives</strong>, basées sur la composition des indices suivis par tes ETF.',

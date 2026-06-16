@@ -515,7 +515,7 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 .cf-sg-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r2);padding:1.1rem 1.2rem;margin-bottom:1rem;}
 .cf-sg-h{font-size:14px;font-weight:600;margin-bottom:.6rem;}
 .cf-sg-line{font-size:12.5px;color:var(--text2);font-family:var(--mono);line-height:1.6;margin-bottom:.35rem;}
-.cf-sg-line strong{color:var(--text);}
+.cf-sg-line strong{color:#c8ccd6;font-weight:600;}
 .cf-lev{margin:.55rem 0;}
 .cf-lev-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-family:var(--mono);color:var(--text);margin-bottom:4px;gap:8px;}
 .cf-lev-val{color:var(--text2);white-space:nowrap;}
@@ -530,13 +530,17 @@ footer{text-align:center;padding:1.2rem;border-top:1px solid var(--border);margi
 .cf-sf-field{display:flex;flex-direction:column;gap:5px;}
 .cf-sf-field>span{font-size:12px;color:var(--text2);font-family:var(--mono);}
 .cf-sf-amt{display:flex;align-items:center;gap:6px;font-family:var(--mono);color:var(--text2);font-size:15px;}
-.cf-sf-amt input{flex:1;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:9px 12px;font-size:18px;font-weight:600;font-family:var(--mono);text-align:right;}
+.cf-sf-amt input{width:150px;flex:0 0 auto;background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:var(--r);padding:9px 12px;font-size:18px;font-weight:600;font-family:var(--mono);text-align:left;}
 .cf-sf-amt input:focus{border-color:var(--accent);outline:none;}
 .cf-sf-slider{margin:1.1rem 0 .5rem;}
 .cf-sf-slider-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text2);font-family:var(--mono);margin-bottom:.5rem;}
 .cf-sf-slider-top strong{color:var(--accent);font-size:14px;}
 .cf-sf-slider input[type=range]{width:100%;accent-color:var(--accent);}
-.cf-sf-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px;padding:0 2px;}
+/* Marqueurs de mois positionnés à leur valeur réelle sur le curseur (1→12).
+   Les marges latérales (~½ largeur du curseur) alignent le 0–100% de l'échelle
+   sur la course réelle du curseur, sinon les nombres tombent à côté. */
+.cf-sf-scale{position:relative;height:12px;margin:4px 8px 0;font-size:10px;color:var(--text3);font-family:var(--mono);}
+.cf-sf-scale span{position:absolute;transform:translateX(-50%);}
 .cf-sf-target{font-size:13px;color:var(--text2);font-family:var(--mono);margin:.9rem 0 .7rem;line-height:1.5;}
 .cf-sf-bar-track{height:12px;background:var(--bg3);border-radius:8px;overflow:hidden;border:1px solid var(--border);}
 .cf-sf-bar{height:100%;width:0;border-radius:8px;transition:width .5s cubic-bezier(.22,1,.36,1),background .3s ease;}
